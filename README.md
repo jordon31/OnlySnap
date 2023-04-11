@@ -21,6 +21,7 @@ OF Scraper is a Python script that allows you to download content from OnlyFans 
 1. Clone the repository or download the source code.
 2. Install the required Python libraries by running `pip install -r requirements.txt`.
 3. Edit the `auth.json` file with your user agent, user ID, x-bc, and session token.
+4. VIDEO: "https://youtu.be/F2AP5czkdbA"
 
 ## Usage
 
