@@ -11,9 +11,16 @@ import logging
 import emoji
 import traceback
 import datetime
+import ctypes
 from datetime import date
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+ctypes.windll.kernel32.SetConsoleTitleW("OF-SCR") #Title Application Windows
+sys.stdout.write(f"\x1b]2;{'OF-SCR'}\x07") #Title Application MAC
+sys.stdout.write(f"\033]0;{'OF-SCR'}\a") #TItle Application Linux
+sys.stdout.flush()
+
 
 # api info
 URL = "https://onlyfans.com"
@@ -31,6 +38,20 @@ PROFILE = ""
 # profile data from /users/<profile>
 PROFILE_INFO = {}
 PROFILE_ID = ""
+
+def main_menu():
+    while True:
+        print("\nMenu:")
+        print("1) OnlyFans")
+        print("2) Exit")
+        choice = input("Select an option: ")
+        if choice == "1":
+            os.system('cls' if os.name == 'nt' else 'clear')
+            break 
+        elif choice == "2":
+            sys.exit()
+        else:
+            print("Invalid option, please try again.")
 
 
 # helper function to make sure a dir is present
@@ -324,8 +345,6 @@ def download_posts(posts, is_archived, pbar):
 
     return media_downloaded
 
-
-
 def get_all_videos(videos):
     with ThreadPoolExecutor(max_workers=3) as executor:  # Improved Velocity ("if you notice prolonging blocks put to "2" on all workeds))
         futures = []
@@ -366,6 +385,7 @@ def get_all_photos(images):
     return images
 
 if __name__ == "__main__":
+    main_menu()
 
     print("\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     print("~      (^.^) Hello! :>     ~")
@@ -396,7 +416,7 @@ while True:
             PROFILE_INFO = get_user_info(PROFILE)
             PROFILE_ID = str(PROFILE_INFO["id"])
 
-            print("\nonlyfans-dl is downloading content to profiles/" + PROFILE + "!\n")
+            print("\nThe content is being downloaded to the profiles/" + PROFILE + " directory using OF-SCR.\n")
 
             if os.path.isdir("profiles/" + PROFILE):
                 print("\nThe folder profiles/" + PROFILE + " exists.")
@@ -424,16 +444,28 @@ while True:
             if sinf["joinDate"] is not None:
                 sinf["joinDate"] = datetime.datetime.strptime(sinf["joinDate"], "%Y-%m-%dT%H:%M:%S+00:00").strftime("%Y-%m-%d")
             if sinf["lastSeen"] is not None:
-                sinf["lastSeen"] = datetime.datetime.strptime(sinf["lastSeen"], "%Y-%m-%dT%H:%M:%S+00:00").strftime("%Y-%m-%d--T: %H:%M")
+                sinf["lastSeen"] = datetime.datetime.strptime(sinf["lastSeen"], "%Y-%m-%dT%H:%M:%S+00:00").strftime("%Y-%m-%d - TIME: %H:%M")
 
             emoji_pattern = re.compile("["
-                u"\U0001F600-\U0001F64F"  # emoticons
-                u"\U0001F300-\U0001F5FF"  # symbols & pictographs
-                u"\U0001F680-\U0001F6FF"  # transport & map symbols
-                u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
-                u"\u2019"                 # '
-                "]+", flags=re.UNICODE)
+            u"\U0001F000-\U0001F6FF"  # emoticons
+            u"\U0001F700-\U0001F77F"  # dingbats
+            u"\U0001F780-\U0001F7FF"  # geometric shapes
+            u"\U0001F800-\U0001F8FF"  # miscellaneous symbols
+            u"\U0001F900-\U0001F9FF"  # supplemental symbols and pictographs
+            u"\U0001FA00-\U0001FA6F"  # sports and activities
+            u"\U0001FA70-\U0001FAFF"  # food and drink
+            u"\U00002702-\U000027B0"  # other miscellaneous symbols
+            u"\U00002700-\U00002702"  # dingbats
+            u"\u200d"                 # zero-width joiner
+            u"\u2019"                 # '
+            u"\ufe0f"                 # VS16
+            u"\u2640-\u2642"          # gender symbols
+            u"\u2600-\u26FF"          # miscellaneous symbols
+            u"\u2700-\u27BF"          # dingbats
+            "]+", flags=re.UNICODE)
+
             about_clean = emoji_pattern.sub(lambda x: '', sinf['about'])
+            about_clean = about_clean.replace('\n\n', '').replace('\n', '')
 
             sinf['about'] = about_clean
             sinf = {k: v for k, v in sinf.items() if v is not None}
@@ -457,7 +489,9 @@ while True:
                 #print("Found " + str(len(video_posts)) + " videos.")
                 print("Finding archived content...", end=' ', flush=True)
                 archived_posts = api_request("/users/" + PROFILE_ID + "/posts/archived", getdata={"limit": "999999"})
+                #print("API response: ", archived_posts)
                 #print("Found " + str(len(archived_posts)) + " archived posts.")
+                #messages_posts = api_request("/chats/" + PROFILE_ID + "/messages", getparams={"limit": "999999"})
                 ################################################
                 extra_img_posts = api_request("/users/" + PROFILE_ID + "/posts/photos", getdata={"limit": "999999"})
                 extra_video_posts = api_request("/users/" + PROFILE_ID + "/posts/videos", getdata={"limit": "999999"})
@@ -466,22 +500,26 @@ while True:
                 archived_postcount = len(archived_posts)
                 
                 if postcount + archived_postcount == 0:
-                    print("ERROR: 0 posts found.")
-                    exit()
+                   print("ERROR: 0 posts found.")
+                   exit()
                 has_photos = len(photo_posts) > 0
                 has_videos = len(video_posts) > 0
-                has_archived = len(video_posts) > 0
+                has_archived = len(archived_posts) > 0
 
-                if has_photos:
-                    assure_dir("profiles/" + PROFILE + "/Photos")
-                if has_videos:
-                    assure_dir("profiles/" + PROFILE + "/Videos")
-                if has_archived:
-                    assure_dir("profiles/" + PROFILE + "/Archived")
-                    if has_photos:        
-                        assure_dir("profiles/" + PROFILE + "/Archived/Photos")
-                    if has_videos:
-                        assure_dir("profiles/" + PROFILE + "/Archived/Videos")
+                if has_photos or has_videos or has_archived:  
+                    if has_photos:
+                        assure_dir("profiles/" + PROFILE + "/Photos")
+                    if  has_videos:
+                        assure_dir("profiles/" + PROFILE + "/Videos")
+                    if  has_archived:
+                        assure_dir("profiles/" + PROFILE + "/Archived")
+                        if has_photos:
+                           assure_dir("profiles/" + PROFILE + "/Archived/Photos")
+                        if has_videos:
+                           assure_dir("profiles/" + PROFILE + "/Archived/Videos")
+                else:
+                    print("No photos, videos, or archives found. Skipping folder creation.")
+                    continue
 
                 total_count = postcount
 
