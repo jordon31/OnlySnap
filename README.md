@@ -37,3 +37,9 @@ The downloaded content will be saved in a directory named "profiles" in the same
 ## Disclaimer
 
 This script is for educational purposes only. Please respect the content creators' rights and only use the downloaded content for personal use. Do not share or distribute the content without the creator's consent.
+
+## GPL-3
+
+OF Scraper is distributed under the terms of the GNU General Public License version 3 (GPLv3). The project comes from the source code of "[onlyfans-dl](https://github.com/k0rnh0li0/onlyfans-dl)". I made some code changes and posted the project to my GitHub account.
+
+Some changes. I hope this project will be useful for other users and we invite anyone interested to contribute to its growth.
