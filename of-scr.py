@@ -131,7 +131,6 @@ def api_request(endpoint, getdata=None, postdata=None, getparams=None):
                     if posts_num < MAX_LIMIT:
                         break
 
-
                     # Re-add again the updated beforePublishTime/postedAtPrecise params
                     beforePublishTime = list_extend[posts_num - 1]['postedAtPrecise']
                     getparams['beforePublishTime'] = beforePublishTime
@@ -230,8 +229,19 @@ def download_public_files():
 
 
 def get_year_folder(timestamp, media_type):
-    year = timestamp.year
-    folder_name = str(year)
+    today = dt.date.today()
+    yesterday = today - dt.timedelta(days=1)
+    last_week = today - dt.timedelta(days=7)
+    post_date = timestamp.date()
+    if post_date == today:
+        folder_name = "Today"
+    elif post_date == yesterday:
+        folder_name = "Yesterday"
+    elif post_date > last_week:
+        folder_name = "Last Week"
+    else:
+        year = timestamp.year
+        folder_name = str(year)
     if media_type == "photo":
         photo_path = "profiles/" + PROFILE + "/photos/" + folder_name
         assure_dir(photo_path)
