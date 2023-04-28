@@ -188,13 +188,16 @@ def search_profiles(query):
 # download public files like avatar and header
 new_files = 0
 
+from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.shortcuts import prompt
+
 def select_sub():
     # Get Subscriptions
     SUBS = get_subs()
-    #sub_dict.update({"0": "*** Download All Models ***"})
+    # sub_dict.update({"0": "*** Download All Models ***"})
     ALL_LIST = []
     for i in range(1, len(SUBS)+1):
-                ALL_LIST.append(i)
+        ALL_LIST.append(i)
     for i in range(0, len(SUBS)):
         sub_dict.update({i+1: SUBS[i]["username"]})
     if len(sub_dict) == 1:
@@ -207,10 +210,13 @@ def select_sub():
 
     # Create a list of full usernames for autocomplete
     username_list = [value for key, value in sub_dict.items()]
+    username_list.insert(0, "*** Download All Models ***")
     username_completer = WordCompleter(username_list, ignore_case=True)
 
     # Use the prompt() function to allow the user to select a template with autocomplete
     MODELS = prompt("Enter the profile name to download (use TAB for automatic completion -- Or to see the full list):", completer=username_completer)
+    if MODELS == "*** Download All Models ***":
+        return ALL_LIST
     selected_models = [key for key, value in sub_dict.items() if value.lower() == MODELS.lower().strip()]
 
     if len(selected_models) == 0:
@@ -245,7 +251,6 @@ def download_public_files():
             download_file(PROFILE_INFO[public_file], path)
             global new_files
             new_files += 1
-
 
 def get_year_folder(timestamp, media_type):
     today = dt.date.today()
@@ -568,14 +573,14 @@ while True:
 
                 media_count = 0
                 with tqdm(total=total_count, desc="Downloading", ncols=80, unit=" files", leave=False) as pbar:
-                    media_downloaded, skipped_posts = download_posts(photo_posts, False, pbar, skip_tagged_posts=False) #Photo Post  -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
+                    media_downloaded, skipped_posts = download_posts(photo_posts, False, pbar, skip_tagged_posts=True) #Photo Post  -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
                     media_count += media_downloaded                                                              #False--True
 
-                    media_downloaded, skipped_posts_2 = download_posts(video_posts, False, pbar, skip_tagged_posts=False) #Video Post -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
+                    media_downloaded, skipped_posts_2 = download_posts(video_posts, False, pbar, skip_tagged_posts=True) #Video Post -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
                     media_count += media_downloaded                                                               #False--True
                     skipped_posts += skipped_posts_2
                                                                                                                     
-                    media_downloaded, skipped_posts_3 = download_posts(archived_posts, True, pbar, skip_tagged_posts=False) #Archived Post -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
+                    media_downloaded, skipped_posts_3 = download_posts(archived_posts, True, pbar, skip_tagged_posts=True) #Archived Post -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
                     media_count += media_downloaded                                                                 #False--True
                     skipped_posts += skipped_posts_3
                     
