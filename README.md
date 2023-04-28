@@ -38,7 +38,7 @@ To search for content based on keywords, enter a query when prompted to select a
 
 ### Skip "@" tags
 
-To skip files that contain "@" tags, enter "true" when prompted to skip "@" files. To download all files, enter "false".
+By default, OF Scraper does not skip files that contain "@" tags. However, you can choose to skip these files by setting the "skip_tagged_posts" option to "True"
 
 ## Known Issues
 
