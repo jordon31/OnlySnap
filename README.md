@@ -28,7 +28,7 @@ OF Scraper is a Python script that allows you to download content from OnlyFans 
 
 ## Usage
 
-To start the script, run `python of-scr.py`. The script will prompt you to enter the number corresponding to the profile you want to download content from. You can also download content from multiple profiles at once by entering multiple numbers separated by commas. To download content from all profiles, enter "0".
+To start the script, run the python command `of-scr.py`. The script will ask you to select the profile you want to download content from, using the auto-complete feature for profile names (TAB). You can use the TAB key at the start of the search to see the complete list of profiles and select with the arrow keys
 
 The downloaded content will be saved in a directory named "profiles" in the same location as the script. Each profile will have its own subdirectory, containing folders for photos, videos, avatar, header, and archived posts.
 
