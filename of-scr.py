@@ -15,12 +15,14 @@ import ctypes
 from datetime import date
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from prompt_toolkit import prompt
+from prompt_toolkit.completion import WordCompleter
+
 
 ctypes.windll.kernel32.SetConsoleTitleW("OF-SCR") #Title Application Windows
 sys.stdout.write(f"\x1b]2;{'OF-SCR'}\x07") #Title Application MAC
 sys.stdout.write(f"\033]0;{'OF-SCR'}\a") #TItle Application Linux
 sys.stdout.flush()
-
 
 # api info
 URL = "https://onlyfans.com"
@@ -53,7 +55,6 @@ def main_menu():
         else:
             print("Invalid option, please try again.")
 
-
 # helper function to make sure a dir is present
 def assure_dir(path):
     if not os.path.isdir(path):
@@ -72,7 +73,6 @@ def create_auth():
         "Cookie": "sess=" + ljson["sess"],
         "app-token": APP_TOKEN
     }
-
 
 # Every API request must be signed
 def create_signed_headers(link, queryParams):
@@ -181,6 +181,9 @@ def get_subs():
     }
     return api_request("/subscriptions/subscribes", getparams=params).json()
 
+def search_profiles(query):
+    filtered_profiles = {key: value for key, value in sub_dict.items() if query.lower() in value.lower()}
+    return filtered_profiles
 
 # download public files like avatar and header
 new_files = 0
@@ -188,7 +191,7 @@ new_files = 0
 def select_sub():
     # Get Subscriptions
     SUBS = get_subs()
-    sub_dict.update({"0": "*** Download All Models ***"})
+    #sub_dict.update({"0": "*** Download All Models ***"})
     ALL_LIST = []
     for i in range(1, len(SUBS)+1):
                 ALL_LIST.append(i)
@@ -201,11 +204,27 @@ def select_sub():
     # Select Model
     if ARG1 == "all":
         return ALL_LIST
-    MODELS = str((input('\n'.join('{} | {}'.format(key, value) for key, value in sub_dict.items()) + "\nEnter number to download model:\n")))
-    if MODELS == "0":
-        return ALL_LIST
+
+    # Create a list of full usernames for autocomplete
+    username_list = [value for key, value in sub_dict.items()]
+    username_completer = WordCompleter(username_list, ignore_case=True)
+
+    # Use the prompt() function to allow the user to select a template with autocomplete
+    MODELS = prompt("Enter the profile name to download (use TAB for automatic completion -- Or to see the full list):", completer=username_completer)
+    selected_models = [key for key, value in sub_dict.items() if value.lower() == MODELS.lower().strip()]
+
+    if len(selected_models) == 0:
+        print("No matching profiles found.")
+        time.sleep(2)
+        print("\033[2J\033[H") # Clear console
+        return select_sub()
+    elif len(selected_models) == 1:
+        return selected_models
     else:
-        return [x.strip() for x in MODELS.split(',')]
+        print("Error: Multiple matching profiles found.")
+        time.sleep(2)
+        print("\033[2J\033[H") # Clear console
+        return select_sub()
 
 #FIX TIME
 def set_file_mtime(file_path, timestamp):
@@ -249,8 +268,6 @@ def get_year_folder(timestamp, media_type):
         video_path = "profiles/" + PROFILE + "/videos/" + folder_name
         assure_dir(video_path)
     return folder_name
-
-
 
 def get_year_path(post_date):
     post_year = post_date.year
@@ -329,14 +346,19 @@ def calc_process_time(starttime, arraykey, arraylength):
     timeelapseddelta = dt.timedelta(seconds=(int(timeelapsed)))  # same here
     return (timeelapseddelta, lefttime, finishtime)
 
-
 # iterate over posts, downloading all media
 # returns the new count of downloaded posts
-def download_posts(posts, is_archived, pbar):
+def download_posts(posts, is_archived, pbar, skip_tagged_posts=False):
     media_downloaded = 0
-    with ThreadPoolExecutor(max_workers=3) as executor: # Improved Downlod ("if you notice prolonging blocks put to "2" on all workeds)
+    skipped_posts = 0  # Initialize the variable to count skipped posts
+    with ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
         for post in posts:
+            # Skip post with @ "tag other profile (AD)" if skip_tagged_posts is True
+            if skip_tagged_posts and post["text"] is not None and "@" in post["text"].lower():
+                skipped_posts += 1  # Increment the variable when a post is skipped
+                continue
+
             if "media" not in post or ("canViewMedia" in post and not post["canViewMedia"]):
                 continue
 
@@ -353,7 +375,8 @@ def download_posts(posts, is_archived, pbar):
                 media_downloaded += 1
                 pbar.update(1)
 
-    return media_downloaded
+    # Return the count of skipped posts as a separate output
+    return media_downloaded, skipped_posts
 
 def get_all_videos(videos):
     with ThreadPoolExecutor(max_workers=3) as executor:  # Improved Velocity ("if you notice prolonging blocks put to "2" on all workeds))
@@ -374,7 +397,6 @@ def get_all_videos(videos):
 
     return videos
 
-
 def get_all_photos(images):
     with ThreadPoolExecutor(max_workers=3) as executor:  # Improved Velocity ("if you notice prolonging blocks put to "2" on all workeds))
         futures = []
@@ -393,6 +415,14 @@ def get_all_photos(images):
             has_more_images = len(extra_img_posts) > 0
 
     return images
+
+def count_files(posts):
+    count = 0
+    for post in posts:
+        if "media" not in post or ("canViewMedia" in post and not post["canViewMedia"]):
+            continue
+        count += len(post["media"])
+    return count
 
 if __name__ == "__main__":
     main_menu()
@@ -422,6 +452,7 @@ while True:
 
         # start process
         for M in SELECTED_MODELS:
+            new_files = 0
             PROFILE = sub_dict[int(M)]
             PROFILE_INFO = get_user_info(PROFILE)
             PROFILE_ID = str(PROFILE_INFO["id"])
@@ -531,28 +562,32 @@ while True:
                     print("No photos, videos, or archives found. Skipping folder creation.")
                     continue
 
-                total_count = postcount
+                total_count = count_files(photo_posts) + count_files(video_posts) + count_files(archived_posts)
 
                 starttime = time.time()
 
                 media_count = 0
-                with tqdm(total=total_count, desc="Downloading", ncols=80, unit=" files", leave=False) as pbar: #is not precise for update file and other.. but Work 100% for scrape all media :=)
-                    #pbar.set_postfix({})
-                    media_downloaded = download_posts(photo_posts, False, pbar)
-                    media_count += media_downloaded
+                with tqdm(total=total_count, desc="Downloading", ncols=80, unit=" files", leave=False) as pbar:
+                    media_downloaded, skipped_posts = download_posts(photo_posts, False, pbar, skip_tagged_posts=False) #Photo Post  -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
+                    media_count += media_downloaded                                                              #False--True
 
-                    media_downloaded = download_posts(video_posts, False, pbar)
-                    media_count += media_downloaded
-
-                    media_downloaded = download_posts(archived_posts, True, pbar)
-                    media_count += media_downloaded
+                    media_downloaded, skipped_posts_2 = download_posts(video_posts, False, pbar, skip_tagged_posts=False) #Video Post -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
+                    media_count += media_downloaded                                                               #False--True
+                    skipped_posts += skipped_posts_2
+                                                                                                                    
+                    media_downloaded, skipped_posts_3 = download_posts(archived_posts, True, pbar, skip_tagged_posts=False) #Archived Post -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
+                    media_count += media_downloaded                                                                 #False--True
+                    skipped_posts += skipped_posts_3
                     
-                print("\nDOWNLOADED " + str(new_files) + " NEW FILES")
+                print("\nDOWNLOADED " + str(new_files) + " NEW FILES\n")
+                print(f"\nSkipped {skipped_posts} posts with @ tag")
                 user_choice = ''
                 while user_choice not in ['c', 'q']:
                     user_choice = input("\nPress 'c' to continue with another user or 'q' to exit: ").lower()
                 if user_choice == 'q':
                     sys.exit()
+                elif user_choice == 'c':
+                    os.system('cls' if os.name == 'nt' else 'clear')
     except Exception as e:
             print(f"\nAn error has occurred: {e}\n{traceback.format_exc()}")
             print("Please try again.")
