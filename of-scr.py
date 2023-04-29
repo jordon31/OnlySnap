@@ -18,7 +18,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 
-
 ctypes.windll.kernel32.SetConsoleTitleW("OF-SCR") #Title Application Windows
 sys.stdout.write(f"\x1b]2;{'OF-SCR'}\x07") #Title Application MAC
 sys.stdout.write(f"\033]0;{'OF-SCR'}\a") #TItle Application Linux
@@ -188,13 +187,9 @@ def search_profiles(query):
 # download public files like avatar and header
 new_files = 0
 
-from prompt_toolkit.completion import WordCompleter
-from prompt_toolkit.shortcuts import prompt
-
 def select_sub():
     # Get Subscriptions
     SUBS = get_subs()
-    # sub_dict.update({"0": "*** Download All Models ***"})
     ALL_LIST = []
     for i in range(1, len(SUBS)+1):
         ALL_LIST.append(i)
@@ -214,9 +209,10 @@ def select_sub():
     username_completer = WordCompleter(username_list, ignore_case=True)
 
     # Use the prompt() function to allow the user to select a template with autocomplete
-    MODELS = prompt("Enter the profile name to download (use TAB for automatic completion -- Or to see the full list):", completer=username_completer)
+    MODELS = prompt("\nEnter the profile name to download (use TAB for automatic completion -- Or to see the full list):\n\n", completer=username_completer)
     if MODELS == "*** Download All Models ***":
         return ALL_LIST
+        
     selected_models = [key for key, value in sub_dict.items() if value.lower() == MODELS.lower().strip()]
 
     if len(selected_models) == 0:
@@ -252,7 +248,7 @@ def download_public_files():
             global new_files
             new_files += 1
 
-def get_year_folder(timestamp, media_type):
+def get_year_folder(timestamp, media_type, tag_folder=None):
     today = dt.date.today()
     yesterday = today - dt.timedelta(days=1)
     last_week = today - dt.timedelta(days=7)
@@ -266,13 +262,20 @@ def get_year_folder(timestamp, media_type):
     else:
         year = timestamp.year
         folder_name = str(year)
+    
+    base_path = "profiles/" + PROFILE
+    if tag_folder is not None:
+        base_path += "/" + tag_folder
+
     if media_type == "photo":
-        photo_path = "profiles/" + PROFILE + "/photos/" + folder_name
+        photo_path = base_path + "/photos/" + folder_name
         assure_dir(photo_path)
     elif media_type == "video":
-        video_path = "profiles/" + PROFILE + "/videos/" + folder_name
+        video_path = base_path + "/videos/" + folder_name
         assure_dir(video_path)
+
     return folder_name
+
 
 def get_year_path(post_date):
     post_year = post_date.year
@@ -280,20 +283,18 @@ def get_year_path(post_date):
     return folder_prefix
 
 # download a media item and save it to the relevant directory
-def download_media(media, is_archived, timestamp=None):
+def download_media(media, is_archived, timestamp=None, tag_folder=None):
     id = str(media["id"])
     source = media["source"]["source"]
 
     if (media["type"] != "photo" and media["type"] != "video" and media["type"] != "gif") or not media['canView']:
         return False
 
-    # find extension
     ext = re.findall('\.\w+\?', source)
     if len(ext) == 0:
         return False
     ext = ext[0][:-1]
 
-    # classify the gif
     if media["type"] == "gif":
         type = "video"
     else:
@@ -305,24 +306,29 @@ def download_media(media, is_archived, timestamp=None):
             path += "photos/"
         else:
             path += "videos/"
+    elif tag_folder is not None:
+        path = "/" + tag_folder + "/"
+        if type == "photo":
+            path += "photos/"
+        else:
+            path += "videos/"
+        folder_name = get_year_folder(timestamp, type, tag_folder=tag_folder)
+        path += folder_name + "/"
     else:
-        folder_name = get_year_folder(timestamp, type)
+        folder_name = get_year_folder(timestamp, type, tag_folder=tag_folder)
         path = "/"
         if type == "photo":
             path += "photos/" + folder_name + "/"
         else:
-             path += "videos/" + folder_name + "/"
-
+            path += "videos/" + folder_name + "/"
 
     path += id + ext
 
     if not os.path.isfile("profiles/" + PROFILE + path):
-        # print(path)
         global new_files
         new_files += 1
         download_file(source, path, timestamp)
         return True
-
     return False
 
 # helper to generally download files
@@ -351,18 +357,26 @@ def calc_process_time(starttime, arraykey, arraylength):
     timeelapseddelta = dt.timedelta(seconds=(int(timeelapsed)))  # same here
     return (timeelapseddelta, lefttime, finishtime)
 
+def create_tag_folder(tag_folder):
+    assure_dir("profiles/" + PROFILE + "/" + tag_folder)
+    assure_dir("profiles/" + PROFILE + "/" + tag_folder + "/Photos")
+    assure_dir("profiles/" + PROFILE + "/" + tag_folder + "/Videos")
+
 # iterate over posts, downloading all media
 # returns the new count of downloaded posts
-def download_posts(posts, is_archived, pbar, skip_tagged_posts=False):
+def download_posts(posts, is_archived, pbar, skip_tagged_posts=False, tag_folder=None):
     media_downloaded = 0
-    skipped_posts = 0  # Initialize the variable to count skipped posts
+    skipped_posts = 0
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = []
         for post in posts:
-            # Skip post with @ "tag other profile (AD)" if skip_tagged_posts is True
-            if skip_tagged_posts and post["text"] is not None and "@" in post["text"].lower():
-                skipped_posts += 1  # Increment the variable when a post is skipped
-                continue
+            if post["text"] is not None and "@" in post["text"].lower():
+                if skip_tagged_posts:
+                    skipped_posts += 1
+                    continue
+                else:
+                    if tag_folder is not None:
+                        create_tag_folder(tag_folder)
 
             if "media" not in post or ("canViewMedia" in post and not post["canViewMedia"]):
                 continue
@@ -372,7 +386,7 @@ def download_posts(posts, is_archived, pbar, skip_tagged_posts=False):
 
             for media in post["media"]:
                 if 'source' in media:
-                    futures.append(executor.submit(download_media, media, is_archived, timestamp=post_timestamp))
+                    futures.append(executor.submit(download_media, media, is_archived, timestamp=post_timestamp, tag_folder=tag_folder if post["text"] is not None and "@" in post["text"].lower() else None))
 
         for future in as_completed(futures):
             was_downloaded = future.result()
@@ -380,8 +394,8 @@ def download_posts(posts, is_archived, pbar, skip_tagged_posts=False):
                 media_downloaded += 1
                 pbar.update(1)
 
-    # Return the count of skipped posts as a separate output
     return media_downloaded, skipped_posts
+
 
 def get_all_videos(videos):
     with ThreadPoolExecutor(max_workers=3) as executor:  # Improved Velocity ("if you notice prolonging blocks put to "2" on all workeds))
@@ -553,6 +567,7 @@ while True:
                 has_archived = len(archived_posts) > 0
 
                 if has_photos or has_videos or has_archived:  
+                    #assure_dir("profiles/" + PROFILE + "/Media")
                     if has_photos:
                         assure_dir("profiles/" + PROFILE + "/Photos")
                     if  has_videos:
@@ -573,22 +588,25 @@ while True:
 
                 media_count = 0
                 with tqdm(total=total_count, desc="Downloading", ncols=80, unit=" files", leave=False) as pbar:
-                    media_downloaded, skipped_posts = download_posts(photo_posts, False, pbar, skip_tagged_posts=True) #Photo Post  -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
+                    media_downloaded, skipped_posts = download_posts(photo_posts, False, pbar, skip_tagged_posts=False, tag_folder="TaggedPosts") #Photo Post  -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
                     media_count += media_downloaded                                                              #False--True
 
-                    media_downloaded, skipped_posts_2 = download_posts(video_posts, False, pbar, skip_tagged_posts=True) #Video Post -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
+                    media_downloaded, skipped_posts_2 = download_posts(video_posts, False, pbar, skip_tagged_posts=False, tag_folder="TaggedPosts") #Video Post -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
                     media_count += media_downloaded                                                               #False--True
                     skipped_posts += skipped_posts_2
                                                                                                                     
-                    media_downloaded, skipped_posts_3 = download_posts(archived_posts, True, pbar, skip_tagged_posts=True) #Archived Post -- True or False  -- (to decide if you want to skip posts with the tag "skip_tagged_posts)=")
-                    media_count += media_downloaded                                                                 #False--True
+                    media_downloaded, skipped_posts_3 = download_posts(archived_posts, True, pbar, skip_tagged_posts=True, tag_folder="TaggedPosts") #Archived Post
+                    media_count += media_downloaded  
                     skipped_posts += skipped_posts_3
                     
                 print("\nDOWNLOADED " + str(new_files) + " NEW FILES\n")
                 print(f"\nSkipped {skipped_posts} posts with @ tag")
-                user_choice = ''
-                while user_choice not in ['c', 'q']:
-                    user_choice = input("\nPress 'c' to continue with another user or 'q' to exit: ").lower()
+                if len(SELECTED_MODELS) > 1: # If all models are selected, no need to ask for user input
+                    user_choice = 'c'
+                else:
+                    user_choice = ''
+                    while user_choice not in ['c', 'q']:
+                        user_choice = input("\nPress 'c' to continue with another user or 'q' to exit: ").lower()
                 if user_choice == 'q':
                     sys.exit()
                 elif user_choice == 'c':
