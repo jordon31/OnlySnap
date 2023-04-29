@@ -1,43 +1,60 @@
 # Change Log
 
-## 0.3
+## Version 0.4
 
 ### Added
 
-+ 1 Added function to skip files that contain "@" tags
-+ 2 Added advanced search feature
++ Added a feature to automatically creation of the 'TaggedPosts' folder based on years and weeks.
 
 ### Improved
 
-! 1 Improved loading bar
-! 2 Fixed file count when continuing downloads
-! 3 Other..
+* Improved overall performance and stability.
+* Enhanced user interface.
+* Removed the 'C' button only when scraping all subs.. for individual users it remains.
+* Other improvements.
+
+### Fixed
+
+* Fixed bugs and errors.
+
+## Version 0.3
+
+### Added
+
++ Added a function to skip files that contain "@" tags.
++ Added advanced search feature.
+
+### Improved
+
+* Improved loading bar.
+* Fixed file count when continuing downloads.
+* Other improvements.
 
 When you continue a download, the message "DOWNLOADED " + str(new_files) + " NEW FILES" is not reset.
 
 ### Fixed
 
-! 4 Other..
+* Other fixes.
 
-## 0.2
+## Version 0.2
 
 ### Added
 
-+ 1 Improved folder organization
-+ 2 Added folders:
++ Improved folder organization.
++ Added folders:
     - Today
     - Yesterday
     - Last Week
 
-## 0.1
+## Version 0.1
 
 ### Update
 
-+ 1 Added a start menu
-+ 2 Added more Emoij to delete + \n in .json file (More Clean)
-+ 3 Added title to console
++ Added a start menu.
++ Added more Emoij to delete + \n in .json file (More Clean).
++ Added title to console.
 
 ### Fixed
 
-! 1 Fixed a folder problem that caused folders to be created even if the content was not on the OF profile
-! 2 Other..
+* Fixed a folder problem that caused folders to be created even if the content was not on the OF profile.
+* Other fixes.
