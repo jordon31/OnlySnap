@@ -603,6 +603,7 @@ while True:
                 print(f"\nSkipped {skipped_posts} posts with @ tag")
                 if len(SELECTED_MODELS) > 1: # If all models are selected, no need to ask for user input
                     user_choice = 'c'
+                    time.sleep(2)
                 else:
                     user_choice = ''
                     while user_choice not in ['c', 'q']:
