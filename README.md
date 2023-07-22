@@ -1,6 +1,6 @@
 # OF Scraper
 
-OF Scraper is a Python script that lets you download content from OnlyFans profiles that you're subscribed to.
+OF Scraper is best and a powerful Python script that enables you to easily download content from your subscribed OnlyFans profiles. This versatile tool supports Windows, Mac, and Linux, providing seamless access to your desired content.
 
 ## Features
 
