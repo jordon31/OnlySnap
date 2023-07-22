@@ -497,6 +497,7 @@ if __name__ == "__main__":
 
     print(Fore.WHITE + "\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
     live_print("~  " + Fore.WHITE + "Welcome on " + Fore.WHITE + "Only" + Fore.LIGHTBLUE_EX + "Fans" + Fore.WHITE + " scraper! ~")
+    live_print("~  Telegram: @BrahGirl ~")
     print(Fore.LIGHTBLUE_EX + "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + Style.RESET_ALL + "\n")
 
     # Gather inputs
