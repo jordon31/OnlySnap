@@ -2,3 +2,4 @@ requests
 emoji
 tqdm
 prompt_toolkit
+colorama
