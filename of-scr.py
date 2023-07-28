@@ -193,7 +193,7 @@ def user_me():
         exit()
     return me
 
-# get all subscriptions in json
+# get all subscriptions in json.
 def get_subs():
     SUB_LIMIT = str(user_me()["subscribesCount"])
     params = {
