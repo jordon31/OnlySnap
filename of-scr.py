@@ -393,7 +393,7 @@ def download_posts(posts, is_archived, pbar):
     with ThreadPoolExecutor(max_workers=4) as executor:
         futures = []
         for post in posts:
-            if post["text"] is not None and ("@" in post["text"].lower() or "#adv" in post["text"].lower() or "#ad" in post["text"].lower()):
+            if "text" in post and post["text"] is not None and ("@" in post["text"].lower() or "#adv" in post["text"].lower() or "#ad" in post["text"].lower()):
                 continue
 
             if "media" not in post or ("canViewMedia" in post and not post["canViewMedia"]):
@@ -441,7 +441,7 @@ def download_posts(posts, is_archived, pbar):
     return media_downloaded
 
 def get_all_videos(videos):
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=14) as executor:
         futures = []
         len_vids = len(videos)
         has_more_videos = len_vids > 0
@@ -460,7 +460,7 @@ def get_all_videos(videos):
     return videos
 
 def get_all_photos(images):
-    with ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=14) as executor:
         futures = []
         len_imgs = len(images)
         has_more_images = len_imgs > 0
