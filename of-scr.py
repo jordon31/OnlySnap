@@ -193,7 +193,7 @@ def user_me():
         exit()
     return me
 
-# get all subscriptions in json.
+# get all subscriptions in json
 def get_subs():
     SUB_LIMIT = str(user_me()["subscribesCount"])
     params = {
@@ -203,14 +203,16 @@ def get_subs():
         "limit": SUB_LIMIT
     }
     subscriptions = api_request("/subscriptions/subscribes", getparams=params).json()
-    # Add a new field 'is_free' to each subscription
     for sub in subscriptions:
         if 'currentSubscribePrice' in sub and sub['currentSubscribePrice'] == 0:
             sub['type'] = 'Free'
+            # Check if user has a trial subscription
+            for subscribe in sub['subscribedByData']['subscribes']:
+                if 'type' in subscribe and subscribe['type'] == 'trial':
+                    sub['type'] = 'Trial'
         else:
             sub['type'] = 'Payed'
     return subscriptions
-
 
 def search_profiles(query):
     filtered_profiles = {key: value for key, value in sub_dict.items() if query.lower() in value.lower()}
@@ -299,10 +301,10 @@ def get_year_folder(timestamp, media_type):
     
     base_path = "profiles/" + PROFILE + "/Media"
     if media_type == "photo":
-        photo_path = base_path + "/photos/" + folder_name
+        photo_path = base_path + "/Photos/" + folder_name
         assure_dir(photo_path)
     elif media_type == "video":
-        video_path = base_path + "/videos/" + folder_name
+        video_path = base_path + "/Videos/" + folder_name
         assure_dir(video_path)
 
     return folder_name
@@ -334,16 +336,16 @@ def download_media(media, is_archived, timestamp=None):
     if is_archived:
         path = "/Media/archived/"
         if type == "photo":
-            path += "photos/"
+            path += "Photos/"
         else:
-            path += "videos/"
+            path += "Videos/"
     else:
         folder_name = get_year_folder(timestamp, type)
         path = "/Media/"
         if type == "photo":
-            path += "photos/" + folder_name + "/"
+            path += "Photos/" + folder_name + "/"
         else:
-            path += "videos/" + folder_name + "/"
+            path += "Videos/" + folder_name + "/"
 
     path += id + ext
 
@@ -415,18 +417,18 @@ def download_posts(posts, is_archived, pbar):
                     else:
                         type = media["type"]
                     if is_archived:
-                        path = "/archived/"
+                        path = "/Archived/"
                         if type == "photo":
-                            path += "photos/"
+                            path += "Photos/"
                         else:
-                            path += "videos/"
+                            path += "Videos/"
                     else:
                         folder_name = get_year_folder(post_timestamp, type)
                         path = "/"
                         if type == "photo":
-                            path += "photos/" + folder_name + "/"
+                            path += "Photos/" + folder_name + "/"
                         else:
-                            path += "videos/" + folder_name + "/"
+                            path += "Videos/" + folder_name + "/"
                     path += id + ext
                     if os.path.isfile("profiles/" + PROFILE + path):
                         continue
@@ -486,7 +488,7 @@ def count_files(posts):
         count += len(post["media"])
     return count
 
-def live_print(message, delay=0.03):
+def live_print(message, delay=0.02):
     for char in message:
         print(char, end='', flush=True)
         time.sleep(delay)
