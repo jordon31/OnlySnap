@@ -222,7 +222,6 @@ def search_profiles(query):
 new_files = 0
 
 def select_sub():
-
     SUBS = get_subs()
     ALL_LIST = []
     for i in range(1, len(SUBS)+1):
@@ -232,7 +231,7 @@ def select_sub():
         sub_dict.update({i+1: SUBS[i]['username']})
         sub_type_dict.update({i+1: SUBS[i]['type']})
 
-    if len(sub_dict) == 1:
+    if len(sub_dict) == 0:
         print('No models subbed')
         exit()
 
