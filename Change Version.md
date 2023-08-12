@@ -1,5 +1,9 @@
 # Change Log
 
+## Version 0.6
+
++ Added .gitignore
+
 ## Version 0.5
 
 + New video tutorial: https://youtu.be/JNKRDsodCTc

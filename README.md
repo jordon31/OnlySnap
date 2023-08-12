@@ -23,8 +23,9 @@ OF Scraper is best and a powerful Python script that enables you to easily downl
 1. Clone the repository or download the source code.
 2. Install the required Python libraries by running `pip install -r requirements.txt`.
 3. If the Requests library is not already installed on your machine, you can install it by running `pip install requests`.
-4. Edit the `auth.json` file with your user agent, user ID, x-bc, and session token.
-5. Watch the tutorial video at "https://youtu.be/JNKRDsodCTc" for more detailed instructions.
+4. Copy `auth.json.example` to `auth.json`
+5. Edit the `auth.json` file with your user agent, user ID, x-bc, and session token.
+6. Watch the tutorial video at "https://youtu.be/JNKRDsodCTc" for more detailed instructions.
 
 ## Usage
 
