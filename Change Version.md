@@ -1,5 +1,21 @@
 # Change Log
 
+## Version 0.6
+
++ Changed the application name from "OF-SCR" to "OnlySnap".
++ Added the ability to download messages, streams, stories, and highlights.
++ Implemented cache handling for user IDs and SUB.
++ Introduced a function to create signed headers for the API requests.
++ Incorporated a function to fetch all highlights.
++ Extended the API request function to support multiple endpoint types.
++ Optimized the process of fetching all video, photo, archived, and stream posts.
++ Included functions to download chat media.
++ Added a function to live print messages for better UI experience.
++ Improved error handling and added checks for media availability.
++ General code improvements and bug fixes.
++ Added "https://github.com/jordon31/OnlySnap/issues/13" function (Download Post with txt need only "disable_download_post_with_txt": ture, on " `False`")
++ Added "https://github.com/jordon31/OnlySnap/issues/12" and "https://github.com/jordon31/OnlySnap/pull/14"
+
 ## Version 0.5
 
 + New video tutorial: https://youtu.be/JNKRDsodCTc
