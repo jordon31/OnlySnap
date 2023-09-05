@@ -258,11 +258,10 @@ def get_subs():
                 "offset": str(offset)
             }
             
-            subscriptions = api_request("/subscriptions/subscribes", getparams=params).json()
-            
+            response = api_request("/subscriptions/subscribes", getparams=params).json()
+            subscriptions = response
             if not subscriptions:
                 break
-                
             for sub in subscriptions:
                 if 'currentSubscribePrice' in sub and sub['currentSubscribePrice'] == 0:
                     sub['type'] = 'Free'
