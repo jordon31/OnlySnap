@@ -1,0 +1,24 @@
+{
+    "comments": {
+        "use_month_names": "If true, use month names in folders. If false, does not include the name of the month.",
+        "use_month_numbers": "If true, use the month numbers in the folders. If false, it does not include the month number.",
+        "no_year_folders": "If true, media files will be stored without year folders. If false, media will be organized in year folders.",
+        "disable_cover_highlights": "If true, the cover highlights image will not be downloaded. If false, the cover image will be downloaded.",
+        "disable_folder_highlights": "If true, highlights will be downloaded without individual folders. If false, highlights will be organized in individual folders.",
+        "disable_download_post_with_txt": "This option disables the Photos, Videos, Streams, and Archived folders and creates a Posts folder that puts everything inside it.",
+        "download_tagged_posts": "If true, posts containing specific tags (e.g., '@', '#adv', '#ad') will be downloaded. These posts will be saved in a separate 'Tag-Post' folder. If false, the downloader will skip such posts.",
+        "merge_tagged_media": "If true, and if 'download_tagged_posts' is also true, media from tagged posts (both photos and videos) will be saved directly within the 'Tag-Post' folder, without separate 'Photos' and 'Videos' subfolders. If false, the media will be organized into 'Photos' and 'Videos' subfolders inside the 'Tag-Post' folder.",
+        "thread_worker_count": "Number of threads to use for concurrent downloads. Increase for faster downloads but might consume more resources."
+    },
+    "settings": {
+        "use_month_names": false,
+        "use_month_numbers": false,
+        "no_year_folders": false,
+        "disable_cover_highlights": false,
+        "disable_folder_highlights": false,
+        "disable_download_post_with_txt": true,
+        "download_tagged_posts": false, 
+        "merge_tagged_media": false,
+        "thread_workers_count": 4
+    }
+}
