@@ -1,0 +1,6 @@
+{
+  "user-agent": "your-user-agent-here",
+  "user-id": "your-user-id-here",
+  "x-bc": "your-x-bc-here",
+  "sess": "your-session-here"
+}
