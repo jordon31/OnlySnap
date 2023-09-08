@@ -483,11 +483,11 @@ def download_posts(posts, is_archived, pbar, is_stream=False):
     with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
         futures = []
         for post in posts:
-            # Fix here: First check if 'text' exists in post, then perform the check for tags.
-            contains_tags = any(tag in post.get("text", "").lower() for tag in ["@", "#adv", "#ad"])
-            
+            text = post.get("text", "")
+            contains_tags = any(tag in (text.lower() if text is not None else "") for tag in ["@", "#adv", "#ad"])
+
             if "text" in post and post["text"] is not None and not download_tagged_posts and contains_tags:
-                continue  # Skip this post if we don't want to download tagged posts
+                continue
                 
             if not download_tagged_posts and "spin" in post.get("text", "").lower():
                 continue
