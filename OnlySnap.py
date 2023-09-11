@@ -19,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 from colorama import init, Fore, Style
+system = platform.system()
 
 if system == "Windows":
     ctypes.windll.kernel32.SetConsoleTitleW("OnlySnap") #Title Application Windows
