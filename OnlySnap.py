@@ -19,7 +19,6 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 from colorama import init, Fore, Style
-system = platform.system()
 
 if system == "Windows":
     ctypes.windll.kernel32.SetConsoleTitleW("OnlySnap") #Title Application Windows
@@ -483,13 +482,13 @@ def download_posts(posts, is_archived, pbar, is_stream=False):
     with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
         futures = []
         for post in posts:
-            text = post.get("text", "")
+            text = post.get("text") or ""
             contains_tags = any(tag in (text.lower() if text is not None else "") for tag in ["@", "#adv", "#ad"])
 
             if "text" in post and post["text"] is not None and not download_tagged_posts and contains_tags:
                 continue
                 
-            if not download_tagged_posts and "spin" in post.get("text", "").lower():
+            if not download_tagged_posts and "spin" in text.lower():
                 continue
 
             if "media" not in post or ("canViewMedia" in post and not post["canViewMedia"]):
@@ -661,9 +660,18 @@ def get_all_videos(videos):
             
             for future in as_completed(futures):
                 extra_video_posts = future.result()
-                videos.extend(extra_video_posts)
+                
+                if isinstance(extra_video_posts, list):
+                    videos.extend(extra_video_posts)
+                else:
+                    has_more_videos = False
+                    break
             
-            has_more_videos = any(len(future.result()) > 0 for future in futures)
+            if not videos:
+                has_more_videos = False
+            
+            else:
+                has_more_videos = any(len(future.result()) > 0 for future in futures)
     return videos
 
 def get_all_photos(images):
