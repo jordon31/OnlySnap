@@ -806,7 +806,7 @@ if __name__ == "__main__":
         ARG1 = sys.argv[1]
 
     dynamic_rules = requests.get(
-        'https://raw.githubusercontent.com/DIGITALCRIMINALS/dynamic-rules/main/onlyfans.json').json()
+        'https://raw.githubusercontent.com/DATAHOARDERS/dynamic-rules/main/onlyfans.json').json()
 
     API_HEADER = create_auth()
 
