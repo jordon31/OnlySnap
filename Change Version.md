@@ -6,6 +6,8 @@
 - Improved subscriber cache -- now detects when you subscribe to a new profile and automatically updates without manually deleting the .json file.
 - Added new profile cache (when you visit a profile for the first time and need to re-enter the profile to download only the latest media, now with the cache you don't have to make all the requests from scratch.. (excluding stories / chat / highlights)
 - Added "#!/usr/bin/env python3"
+- Made the #ADV blocks more robust by adding new tag blocks.
+- Further UI improvements will be made in the future.
 - And other small things.. more ideas will be added in the future.
 
 ## Version 0.6
