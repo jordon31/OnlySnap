@@ -64,4 +64,4 @@ OnlySnap is based on the source code of "[onlyfans-dl](https://github.com/k0rnh0
 
 We welcome anyone interested to contribute to the project's growth. If you modify the code and distribute it, you must also make your changes available under the GPLv3 license.
 
-To learn more about the GPLv3 license, please visit https://www.gnu.org/licenses/gpl-3.0.en.chtml.
+To learn more about the GPLv3 license, please visit [https://www.gnu.org/licenses/gpl-3.0.en.html](https://www.gnu.org/licenses/licenses.html).
