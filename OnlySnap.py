@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import re
 import os
 import sys
@@ -19,7 +20,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from prompt_toolkit import prompt
 from prompt_toolkit.completion import WordCompleter
 from colorama import init, Fore, Style
+import logging
 system = platform.system()
+
+#logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+#logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 if system == "Windows":
     ctypes.windll.kernel32.SetConsoleTitleW("OnlySnap") #Title Application Windows
@@ -149,6 +154,7 @@ def api_request(endpoint, getdata=None, postdata=None, getparams=None):
         getparams = {
             "order": "publish_date_desc"
         }
+        
     if getdata is not None:
         for i in getdata:
             getparams[i] = getdata[i]
@@ -229,6 +235,14 @@ def user_me():
         exit()
     return me
 
+def user_me_username():
+    me = api_request("/users/me").json()
+    if "error" in me:
+        print("\nERROR: " + me["error"]["message"])
+        time.sleep(4)
+        exit()
+    return me.get("username", "User")
+
 def save_to_cache(data):
     assure_dir(CACHE_DIR)
     with open(CACHE_FILE, 'w') as f:
@@ -240,44 +254,122 @@ def load_from_cache():
             return json.load(f)
     return None
 
-# get all subscriptions in json
-def get_subs():
-    total_subs = load_from_cache()
-    
-    if total_subs is None:
-        SUB_LIMIT = 10
-        offset = 0
-        total_subs = []
-        
-        while True:
-            params = {
-                "type": "active",
-                "sort": "desc",
-                "field": "expire_date",
-                "limit": str(SUB_LIMIT),
-                "offset": str(offset)
-            }
-            
-            response = api_request("/subscriptions/subscribes", getparams=params).json()
-            subscriptions = response
-            if not subscriptions:
-                break
-            for sub in subscriptions:
-                if 'currentSubscribePrice' in sub and sub['currentSubscribePrice'] == 0:
-                    sub['type'] = 'Free'
-                    # Check if user has a trial subscription
-                    for subscribe in sub['subscribedByData']['subscribes']:
-                        if 'type' in subscribe and subscribe['type'] == 'trial':
-                            sub['type'] = 'Trial'
-                else:
-                    sub['type'] = 'Payed'
-            
-            total_subs.extend(subscriptions)
-            offset += SUB_LIMIT
-        
-        save_to_cache(total_subs)
+def get_subs_count_from_api():
+    me = api_request("/users/me").json()
+    return me.get("subscribesCount", 0)
 
+def update_subs_cache_if_needed():
+    current_subs_count = get_subs_count_from_api()
+    cache_subs_count = load_subs_count_from_cache()
+    
+    if current_subs_count != cache_subs_count:
+        print("Subscription update in progress...")
+        total_subs = fetch_and_cache_subs()
+        save_subs_count_to_cache(current_subs_count)
+        os.system('cls' if os.name == 'nt' else 'clear')
+        return total_subs
+    else:
+        return load_from_cache()
+
+def load_subs_count_from_cache():
+    subs_count_file = os.path.join(CACHE_DIR, "subs_count.json")
+    if os.path.exists(subs_count_file):
+        with open(subs_count_file, 'r') as f:
+            return json.load(f).get("subscribesCount", 0)
+    return 0
+
+def save_subs_count_to_cache(subs_count):
+    subs_count_file = os.path.join(CACHE_DIR, "subs_count.json")
+    with open(subs_count_file, 'w') as f:
+        json.dump({"subscribesCount": subs_count}, f)
+
+def update_cache_if_subs_changed():
+    user_info = api_request("/users/me").json()
+    current_subs_count = user_info.get("subscribesCount", 0)
+    
+    cached_subs_count = load_subs_count_from_cache()
+    
+    if current_subs_count != cached_subs_count:
+        print("Number of subscriptions changed. Updating cache in progress...")
+        fetch_and_cache_subs()
+        save_subs_count_to_cache(current_subs_count)
+        os.system('cls' if os.name == 'nt' else 'clear')
+    
+def read_from_cache(profile_id, data_type):
+    start_time = time.time()
+    profile_cache_file = os.path.join(CACHE_DIR, f"profile_{profile_id}", f"cache_{profile_id}.json")
+    if os.path.exists(profile_cache_file):
+        with open(profile_cache_file, 'r') as f:
+            cache_data = json.load(f)
+            cached_value = cache_data.get(data_type)
+            if cached_value:
+                logging.debug(f"{data_type} data found in cache. Cache read time: {time.time() - start_time} seconds.")
+            else:
+                logging.debug(f"{data_type} data not found in cache.")
+            return cached_value
+    logging.debug(f"No cache file found for profile {profile_id}.")
+    return None
+
+def update_profile_cache(profile_id, data_type, new_data):
+    start_time = time.time()
+    profile_cache_dir = os.path.join(CACHE_DIR, f"profile_{profile_id}")
+    if not os.path.exists(profile_cache_dir):
+        os.makedirs(profile_cache_dir)
+    profile_cache_file = os.path.join(profile_cache_dir, f"cache_{profile_id}.json")
+    
+    if os.path.exists(profile_cache_file):
+        with open(profile_cache_file, 'r') as f:
+            cache_data = json.load(f)
+    else:
+        cache_data = {}
+    
+    cache_data[data_type] = new_data
+    
+    with open(profile_cache_file, 'w') as f:
+        json.dump(cache_data, f, indent=4)
+    logging.debug(f"Cache for {data_type} updated. Cache update time: {time.time() - start_time} seconds.")
+
+def fetch_and_cache_subs():
+    SUB_LIMIT = 10
+    offset = 0
+    total_subs = []
+    
+    while True:
+        params = {
+            "type": "active",
+            "sort": "desc",
+            "field": "expire_date",
+            "limit": str(SUB_LIMIT),
+            "offset": str(offset)
+        }
+        
+        response = api_request("/subscriptions/subscribes", getparams=params).json()
+        subscriptions = response
+        if not subscriptions:
+            break
+        for sub in subscriptions:
+            if 'currentSubscribePrice' in sub and sub['currentSubscribePrice'] == 0:
+                sub['type'] = 'Free'
+                for subscribe in sub['subscribedByData']['subscribes']:
+                    if 'type' in subscribe and subscribe['type'] == 'trial':
+                        sub['type'] = 'Trial'
+            else:
+                sub['type'] = 'Paid'
+        
+        total_subs.extend(subscriptions)
+        offset += SUB_LIMIT
+    
+    save_to_cache(total_subs)
     return total_subs
+
+def get_subs():
+    cached_subs = load_from_cache()
+
+    if cached_subs is None:
+        print("Cache not found or update required. Downloading subscriptions..")
+        cached_subs = fetch_and_cache_subs()
+
+    return cached_subs
 
 def search_profiles(query):
     filtered_profiles = {key: value for key, value in sub_dict.items() if query.lower() in value.lower()}
@@ -350,9 +442,10 @@ def download_public_files():
         if source is None:
             continue
         id = get_id_from_path(source)
-        file_type = re.findall("\.\w+", source)[-1]
+        file_type = re.findall(r"\.\w+", source)[-1]
         path = "/" + public_file + file_type
         full_path = "Profiles/" + PROFILE + "/Public" + path
+        
         if not os.path.isfile(full_path):
             download_file(PROFILE_INFO[public_file], full_path)
             global new_files
@@ -411,7 +504,7 @@ def download_media(media, is_archived, path=None, timestamp=None, is_stream=Fals
     if (media["type"] != "photo" and media["type"] != "video" and media["type"] != "gif") or not media['canView']:
         return False
 
-    ext = re.findall('\.\w+\?', source)
+    ext = re.findall(r'\.\w+\?', source)
     if len(ext) == 0:
         return False
     ext = ext[0][:-1]
@@ -484,7 +577,7 @@ def download_posts(posts, is_archived, pbar, is_stream=False):
         futures = []
         for post in posts:
             text = post.get("text") or ""
-            contains_tags = any(tag in (text.lower() if text is not None else "") for tag in ["@", "#adv", "#ad"])
+            contains_tags = any(tag in (text.lower() if text is not None else "") for tag in ["@", "#adv", "#ad", "#announcement", "#advertising", "#ad24", "#ads"]) #block adv shit
 
             if "text" in post and post["text"] is not None and not download_tagged_posts and contains_tags:
                 continue
@@ -503,20 +596,19 @@ def download_posts(posts, is_archived, pbar, is_stream=False):
                 if 'source' in media and isinstance(media["source"]["source"], str):
                     id = str(media["id"])
                     source = media["source"]["source"]
-                    ext = re.findall('\.\w+\?', source)
+                    ext = re.findall(r'\.\w+\?', source)
                     if len(ext) == 0:
                         continue
                     ext = ext[0][:-1]
                     type = media["type"] if media["type"] != "gif" else "video"
 
-                    # If it's a tagged post, adjust the path accordingly
                     if download_tagged_posts and contains_tags:
                         base_path = f"Profiles/{PROFILE}/Media/Tag-Post"
                         if not merge_tagged_media:
                             path = f"{base_path}/{type}s/"
                         else:
                             path = f"{base_path}/"
-                        assure_dir(path)  # Make sure the directory exists
+                        assure_dir(path)
                     elif save_text_with_media:
                         post_dir = f"Profiles/{PROFILE}/Media/Posts/{post_date_str}"
                         assure_dir(post_dir)
@@ -539,6 +631,24 @@ def download_posts(posts, is_archived, pbar, is_stream=False):
                 pbar.update(1)
                 
     return media_downloaded
+
+def get_all_photos(images):
+    with ThreadPoolExecutor(max_workers=8) as executor:
+        has_more_images = True
+
+        while has_more_images:
+            futures = [executor.submit(
+                api_request,
+                "/users/" + PROFILE_ID + "/posts/photos",
+                getdata={"limit": "999999", "order": "publish_date_desc", "beforePublishTime": images[-1]["postedAtPrecise"] if images else None},
+            ) for _ in range(8)]
+            
+            for future in as_completed(futures):
+                extra_img_posts = future.result()
+                images.extend(extra_img_posts)
+            
+            has_more_images = any(len(future.result()) > 0 for future in futures)
+    return images
 
 def clean_filename(filename):
     invalid_chars = ['<', '>', ':', '"', '/', '\\', '|', '?', '*']
@@ -593,8 +703,8 @@ def download_chats(chats):
         if not isinstance(chat, dict):
             continue
             
-        text = chat.get("text", "")
-        if "#adv" in text.lower() or "#ad" in text.lower() or "spin" in text.lower():
+        text = chat.get("text", "").lower()
+        if ("#adv" in text or "#ad" in text or "spin" in text or "#spins" in text or "@" in text or "https://onlyfans.com/" in text):
             continue
 
         media_items = chat.get("media", [])
@@ -674,6 +784,20 @@ def get_all_videos(videos):
             else:
                 has_more_videos = any(len(future.result()) > 0 for future in futures)
     return videos
+
+
+def load_photo_cache():
+    cache_file_path = os.path.join(CACHE_DIR, f"cache_{PROFILE_ID}_photos.json")
+    if os.path.exists(cache_file_path):
+        with open(cache_file_path, 'r') as f:
+            return json.load(f)
+    return {}
+
+def save_photo_cache(photo_cache):
+    cache_file_path = os.path.join(CACHE_DIR, f"cache_{PROFILE_ID}_photos.json")
+    with open(cache_file_path, 'w') as f:
+        json.dump(photo_cache, f)
+
 
 def get_all_photos(images):
     with ThreadPoolExecutor(max_workers=8) as executor:
@@ -785,6 +909,7 @@ def count_files(posts):
         count += len(post["media"])
     return count
 
+
 def live_print(message, delay=0.01):
     for char in message:
         print(char, end='', flush=True)
@@ -792,23 +917,26 @@ def live_print(message, delay=0.01):
     print()
 
 if __name__ == "__main__":
-    if ARG1 != "--all":
-        main_menu()
-
-    print(Fore.WHITE + "\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-    live_print("~  " + Fore.WHITE + "Welcome on " + Fore.WHITE + "Only" + Fore.LIGHTBLUE_EX + "Snap" + Fore.WHITE + " scraper! ~")
-    live_print("~  Telegram: @BrahGirl ~")
-    print(Fore.LIGHTBLUE_EX + "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + Style.RESET_ALL + "\n")
-
     if len(sys.argv) != 2:
         ARG1 = ""
     else:
         ARG1 = sys.argv[1]
 
     dynamic_rules = requests.get(
-        'https://raw.githubusercontent.com/DIGITALCRIMINALS/dynamic-rules/main/onlyfans.json').json()
+        'https://raw.githubusercontent.com/deviint/onlyfans-dynamic-rules/main/dynamicRules.json').json()
 
     API_HEADER = create_auth()
+
+    if ARG1 != "--all":
+        main_menu()
+
+    username = user_me_username()
+    update_cache_if_subs_changed()
+
+    print(Fore.WHITE + "\n~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+    live_print("~  " + Fore.WHITE + "Welcome " + username + " on " + Fore.WHITE + "Only" + Fore.LIGHTBLUE_EX + "Snap" + Fore.WHITE + " Scraper! ~")
+    live_print("~  Telegram Group: @OnlySnap_tg ~")
+    print(Fore.LIGHTBLUE_EX + "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~" + Style.RESET_ALL + "\n")
 
 while True:  
     try: 
@@ -817,7 +945,11 @@ while True:
 
         for M in SELECTED_MODELS:
             new_files = 0
-            PROFILE = sub_dict[int(M)]
+            try:
+                PROFILE = sub_dict[int(M)]
+            except KeyError:
+                print(f"{M}")
+                continue
             time.sleep(3)
             os.system('cls' if os.name == 'nt' else 'clear')
             PROFILE_INFO = get_user_info(PROFILE)
@@ -833,7 +965,6 @@ while True:
             assure_dir("Profiles/" + PROFILE)
             assure_dir("Profiles/" + PROFILE + "/Public")
 
-            # first save profile info
             print("Saving profile info...")
 
             sinf = {
@@ -864,21 +995,39 @@ while True:
 
                 download_public_files()
 
-                # get all user posts
-                print("Finding photos...", end=' ', flush=True)
-                print()
-                photos = api_request("/users/" + PROFILE_ID + "/posts/photos", getdata={"limit": "999999"})
-                photo_posts = get_all_photos(photos)
-                print("Finding videos...", end=' ', flush=True)
-                print()
-                videos = api_request("/users/" + PROFILE_ID + "/posts/videos", getdata={"limit": "999999"})
-                video_posts = get_all_videos(videos)
-                print("Finding archived content...", end=' ', flush=True)
-                print()
-                streams = api_request("/users/" + PROFILE_ID + "/posts/streams", getdata={"limit": "999999"})
-                stream_posts = get_all_streams(streams)
-                archived_posts_initial = api_request("/users/" + PROFILE_ID + "/posts/archived", getdata={"limit": "999999"})
-                archived_posts = get_all_archived(archived_posts_initial)
+                photo_posts = read_from_cache(PROFILE_ID, "photos")
+                if photo_posts is None or len(photo_posts) == 0:
+                    print("Finding photos...", end=' ', flush=True)
+                    photos = api_request("/users/" + PROFILE_ID + "/posts/photos", getdata={"limit": "999999"})
+                    photo_posts = get_all_photos(photos)
+                    update_profile_cache(PROFILE_ID, "photos", photo_posts)
+                else:
+                    logging.info("Loading photos from cache...")
+                video_posts = read_from_cache(PROFILE_ID, "videos")
+                if video_posts is None or len(video_posts) == 0:
+                    print("Finding videos...", end=' ', flush=True)
+                    videos = api_request("/users/" + PROFILE_ID + "/posts/videos", getdata={"limit": "999999"})
+                    video_posts = get_all_videos(videos)
+                    update_profile_cache(PROFILE_ID, "videos", video_posts)
+                else:
+                    logging.info("Loading videos from cache...")
+                stream_posts = read_from_cache(PROFILE_ID, "streams")
+                if stream_posts is None or len(stream_posts) == 0:
+                    print("Finding streams...", end=' ', flush=True)
+                    streams = api_request("/users/" + PROFILE_ID + "/posts/streams", getdata={"limit": "999999"})
+                    stream_posts = get_all_streams(streams)
+                    update_profile_cache(PROFILE_ID, "streams", stream_posts)
+                else:
+                    logging.info("Loading streams from cache...")
+
+                archived_posts = read_from_cache(PROFILE_ID, "archived")
+                if archived_posts is None or len(archived_posts) == 0:
+                    print("Finding archived content...", end=' ', flush=True)
+                    archived_posts_initial = api_request("/users/" + PROFILE_ID + "/posts/archived", getdata={"limit": "999999"})
+                    archived_posts = get_all_archived(archived_posts_initial)
+                    update_profile_cache(PROFILE_ID, "archived", archived_posts)
+                else:
+                    logging.info("Loading archived content from cache...")
                 ################################################
                 extra_img_posts = api_request("/users/" + PROFILE_ID + "/posts/photos", getdata={"limit": "999999"})
                 extra_video_posts = api_request("/users/" + PROFILE_ID + "/posts/videos", getdata={"limit": "999999"})
@@ -927,13 +1076,13 @@ while True:
                 new_files = 0
                 with tqdm(total=new_files, desc="Downloading", ncols=80, unit=" files", leave=False) as pbar:
 
-                    highlights = get_all_highlights() #no count
+                    highlights = get_all_highlights() #no count #no cache
                     download_highlights(highlights)
 
-                    stories = get_all_stories() #no count
+                    stories = get_all_stories() #no count #no cache
                     download_stories(stories)
 
-                    chats = get_all_chats() #no count
+                    chats = get_all_chats() #no count #no cache
                     download_chats(chats)
 
                     media_downloaded = download_posts(photo_posts, False, pbar) 
