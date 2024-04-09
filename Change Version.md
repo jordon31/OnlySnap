@@ -1,5 +1,13 @@
 # Change Log
 
+## Version 0.7
+
+- Changed "dynamicRules" link which solves the "'str' object does not support item assignment" issue.
+- Improved subscriber cache -- now detects when you subscribe to a new profile and automatically updates without manually deleting the .json file.
+- Added new profile cache (when you visit a profile for the first time and need to re-enter the profile to download only the latest media, now with the cache you don't have to make all the requests from scratch.. (excluding stories / chat / highlights)
+- Added "#!/usr/bin/env python3"
+- And other small things.. more ideas will be added in the future.
+
 ## Version 0.6
 
 + Changed the application name from "OF-SCR" to "OnlySnap".
@@ -13,7 +21,7 @@
 + Added a function to live print messages for better UI experience.
 + Improved error handling and added checks for media availability.
 + General code improvements and bug fixes.
-+ Added "https://github.com/jordon31/OnlySnap/issues/13" function (Download Post with txt need only "disable_download_post_with_txt": ture, on " `False`")
++ Added "https://github.com/jordon31/OnlySnap/issues/13" function (Download Post with txt need only "disable_download_post_with_txt": True, on " `False`")
 + Added "https://github.com/jordon31/OnlySnap/issues/12" and "https://github.com/jordon31/OnlySnap/pull/14"
 
 ## Version 0.5
