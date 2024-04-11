@@ -150,6 +150,7 @@ def create_signed_headers(link, queryParams):
     return
 
 def api_request(endpoint, getdata=None, postdata=None, getparams=None):
+    logging.debug(f"Making API request to {endpoint} with getdata={getdata} and postdata={postdata}")
     if getparams == None:
         getparams = {
             "order": "publish_date_desc"
@@ -309,6 +310,31 @@ def read_from_cache(profile_id, data_type):
             return cached_value
     logging.debug(f"No cache file found for profile {profile_id}.")
     return None
+
+def get_user_post_count(profile_id):
+    logging.debug(f"Requesting user post count for profile ID: {profile_id}")
+    user_info = api_request(f"/users/{profile_id}")
+    medias_count = user_info.json().get("mediasCount", 0)
+    logging.debug(f"Retrieved post count for profile ID {profile_id}: {medias_count}")
+    return medias_count
+
+def check_and_update_profile_cache(profile_id):
+    logging.debug(f"Checking and updating profile cache for profile ID: {profile_id}")
+    current_post_count = get_user_post_count(profile_id)
+    cached_post_count = read_from_cache(profile_id, "post_count")
+    
+    logging.debug(f"Current post count: {current_post_count}, Cached post count: {cached_post_count}")
+    
+    if cached_post_count is None or cached_post_count != current_post_count:
+        print("Number of posts has changed. Updating cache in progress...")
+        logging.info(f"Post count has changed from {cached_post_count} to {current_post_count}. Updating cache and downloading new posts.")
+        user_posts = api_request(f"/users/{profile_id}/posts", getdata={"limit": "999999"})
+        update_profile_cache(profile_id, "posts", user_posts)
+        update_profile_cache(profile_id, "post_count", current_post_count)
+        return True
+    else:
+        logging.debug(f"No change in post count for profile ID: {profile_id}")
+    return False
 
 def update_profile_cache(profile_id, data_type, new_data):
     start_time = time.time()
@@ -966,6 +992,8 @@ while True:
             assure_dir("Profiles/" + PROFILE + "/Public")
 
             print("Saving profile info...")
+            if check_and_update_profile_cache(PROFILE_ID):
+                pass
 
             sinf = {
                 "id": PROFILE_INFO["id"],
