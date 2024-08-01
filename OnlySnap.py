@@ -999,7 +999,7 @@ while True:
                 "id": PROFILE_INFO["id"],
                 "name": PROFILE_INFO["name"],
                 "username": PROFILE_INFO["username"],
-                "about": PROFILE_INFO["rawAbout"],
+                "about": PROFILE_INFO["about"],
                 "joinDate": PROFILE_INFO["joinDate"],
                 "website": PROFILE_INFO["website"],
                 "wishlist": PROFILE_INFO["wishlist"],
