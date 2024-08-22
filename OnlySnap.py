@@ -92,9 +92,12 @@ def create_auth():
         "Accept-Encoding": "gzip, deflate",
         "user-id": ljson["user-id"],
         "x-bc": ljson["x-bc"],
+        "x-of-rev": ljson.get("x-of-rev", ""),
+        "x-hash": ljson.get("x-hash", ""),
         "Cookie": "sess=" + ljson["sess"],
-        "app-token": APP_TOKEN
+        "app-token": APP_TOKEN,
     }
+
 
 def load_config():
     current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -135,9 +138,10 @@ check_and_clear_cache_if_user_id_changed()
 def create_signed_headers(link, queryParams):
     global API_HEADER
     path = "/api2/v2" + link
-    if (queryParams):
+    if queryParams:
         query = '&'.join('='.join((key, str(val))) for (key, val) in queryParams.items())
         path = f"{path}?{query}"
+
     unixtime = str(int(dt.datetime.now().timestamp()))
     msg = "\n".join([dynamic_rules["static_param"], unixtime, path, API_HEADER["user-id"]])
     message = msg.encode("utf-8")
@@ -147,7 +151,8 @@ def create_signed_headers(link, queryParams):
     checksum = sum([sha_1_b[number] for number in dynamic_rules["checksum_indexes"]]) + dynamic_rules["checksum_constant"]
     API_HEADER["sign"] = dynamic_rules["format"].format(sha_1_sign, abs(checksum))
     API_HEADER["time"] = unixtime
-    return
+    API_HEADER["x-of-rev"] = dynamic_rules.get("x-of-rev", "") 
+    API_HEADER["x-hash"] = dynamic_rules.get("x-hash", "") 
 
 def api_request(endpoint, getdata=None, postdata=None, getparams=None):
     logging.debug(f"Making API request to {endpoint} with getdata={getdata} and postdata={postdata}")
@@ -619,19 +624,23 @@ def download_posts(posts, is_archived, pbar, is_stream=False):
             post_date_str = post_timestamp.strftime('%Y-%m-%dT%H_%M_%S')
             
             for media in post["media"]:
-                if 'source' in media and isinstance(media["source"]["source"], str):
-                    id = str(media["id"])
-                    source = media["source"]["source"]
-                    ext = re.findall(r'\.\w+\?', source)
-                    if len(ext) == 0:
-                        continue
-                    ext = ext[0][:-1]
-                    type = media["type"] if media["type"] != "gif" else "video"
+                source_url = None
+                if "source" in media["files"]:
+                    source_url = media["files"]["source"].get("url")
+                elif "full" in media["files"]:
+                    source_url = media["files"]["full"].get("url")
+                elif "thumb" in media["files"]:
+                    source_url = media["files"]["thumb"].get("url")
+                elif "preview" in media["files"]:
+                    source_url = media["files"]["preview"].get("url")
+                elif "squarePreview" in media["files"]:
+                    source_url = media["files"]["squarePreview"].get("url")
 
+                if source_url:
                     if download_tagged_posts and contains_tags:
                         base_path = f"Profiles/{PROFILE}/Media/Tag-Post"
                         if not merge_tagged_media:
-                            path = f"{base_path}/{type}s/"
+                            path = f"{base_path}/{media['type']}s/"
                         else:
                             path = f"{base_path}/"
                         assure_dir(path)
@@ -648,7 +657,7 @@ def download_posts(posts, is_archived, pbar, is_stream=False):
                     else:
                         path = None
                     
-                    futures.append(executor.submit(download_media, media, is_archived, path, post_timestamp, is_stream))
+                    futures.append(executor.submit(download_media, media, is_archived, path, post_timestamp, is_stream, source_url))
                 
         for future in as_completed(futures):
             was_downloaded = future.result()
@@ -657,6 +666,7 @@ def download_posts(posts, is_archived, pbar, is_stream=False):
                 pbar.update(1)
                 
     return media_downloaded
+
 
 def get_all_photos(images):
     with ThreadPoolExecutor(max_workers=8) as executor:
@@ -712,8 +722,23 @@ def download_highlights(highlights):
                 for story in stories:
                     media_items = story.get("media", [])
                     for media_item in media_items:
-                        source_url = media_item["files"]["source"]["url"]
-                        futures.append(executor.submit(download_media, media_item, False, path=path, source_url=source_url))
+                        source_url = None
+                        if "source" in media_item["files"]:
+                            source_url = media_item["files"]["source"].get("url")
+                        elif "full" in media_item["files"]:
+                            source_url = media_item["files"]["full"].get("url")
+                        elif "thumb" in media_item["files"]:
+                            source_url = media_item["files"]["thumb"].get("url")
+                        elif "preview" in media_item["files"]:
+                            source_url = media_item["files"]["preview"].get("url")
+                        elif "squarePreview" in media_item["files"]:
+                            source_url = media_item["files"]["squarePreview"].get("url")
+
+                        if source_url:
+                            futures.append(executor.submit(download_media, media_item, False, path=path, source_url=source_url))
+                        else:
+                            print("Nessun URL trovato nel media_item.")
+                            continue
 
         for future in as_completed(futures):
             future.result()
@@ -736,7 +761,17 @@ def download_chats(chats):
         media_items = chat.get("media", [])
         for media_item in media_items:
             media_type = media_item["type"]
-            source_url = media_item.get("src") or media_item.get("source", {}).get("source")
+
+            source_url = None
+            if "full" in media_item["files"]:
+                source_url = media_item["files"]["full"].get("url")
+            elif "thumb" in media_item["files"]:
+                source_url = media_item["files"]["thumb"].get("url")
+            elif "preview" in media_item["files"]:
+                source_url = media_item["files"]["preview"].get("url")
+            elif "squarePreview" in media_item["files"]:
+                source_url = media_item["files"]["squarePreview"].get("url")
+
             if source_url:
                 if media_type == "photo":
                     photos_to_download.append((media_item, source_url))
@@ -767,19 +802,33 @@ def download_chats(chats):
         for future in as_completed(futures):
             future.result()
 
-
 def download_stories(stories):
     if not stories:
-       return
+        return
 
     assure_dir("Profiles/" + PROFILE + "/Media/Stories")
+    
     with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
         futures = []
+        
         for story in stories:
             media_items = story.get("media", [])
             for media_item in media_items:
-                source_url = media_item["files"]["source"]["url"]
-                futures.append(executor.submit(download_media, media_item, False, path="Profiles/" + PROFILE + "/Media/Stories/", source_url=source_url))
+                source_url = None
+                
+                if "full" in media_item["files"]:
+                    source_url = media_item["files"]["full"].get("url")
+                elif "thumb" in media_item["files"]:
+                    source_url = media_item["files"]["thumb"].get("url")
+                elif "preview" in media_item["files"]:
+                    source_url = media_item["files"]["preview"].get("url")
+                elif "squarePreview" in media_item["files"]:
+                    source_url = media_item["files"]["squarePreview"].get("url")
+                
+                if source_url:
+                    futures.append(executor.submit(download_media, media_item, False, path="Profiles/" + PROFILE + "/Media/Stories/", source_url=source_url))
+                else:
+                    logging.warning(f"URL non trovato per media_item con ID {media_item.get('id')}")
 
         for future in as_completed(futures):
             future.result()
@@ -810,7 +859,6 @@ def get_all_videos(videos):
             else:
                 has_more_videos = any(len(future.result()) > 0 for future in futures)
     return videos
-
 
 def load_photo_cache():
     cache_file_path = os.path.join(CACHE_DIR, f"cache_{PROFILE_ID}_photos.json")
