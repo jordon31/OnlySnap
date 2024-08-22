@@ -2,5 +2,7 @@
   "user-agent": "your-user-agent-here",
   "user-id": "your-user-id-here",
   "x-bc": "your-x-bc-here",
+  "x-hash": "Token Hash",
+  "x-of-rev": "Rev token",
   "sess": "your-session-here"
 }
