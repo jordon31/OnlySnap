@@ -1,5 +1,11 @@
 # Change Log
 
+## Version 0.8
+
+- Updated API OnlyFans
+- OnlyFans has updated the API for videos. As soon as a video is uploaded by any creator, it is automatically protected with DRM (HLS). There is already a bypass implemented in another project, but I'm not sure when I'll be able to integrate it into mine
+- Join on Telegram for update :)
+
 ## Version 0.7
 
 - Changed "dynamicRules" link which solves the "'str' object does not support item assignment" issue.
