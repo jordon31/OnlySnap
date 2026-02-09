@@ -1,4 +1,4 @@
+textual
 requests
-tqdm
-prompt_toolkit
 colorama
+pywidevine

@@ -1,8 +1,12 @@
 {
-  "user-agent": "your-user-agent-here",
-  "user-id": "your-user-id-here",
-  "x-bc": "your-x-bc-here",
-  "x-hash": "Token Hash",
-  "x-of-rev": "Rev token",
-  "sess": "your-session-here"
+    "user-agent": "",
+    "user-id": "",
+    "x-bc": "",
+    "x-hash": "",
+    "x-of-rev": "202602051652-33f0a52396",
+    "sess": "",
+    "st": "",
+    "cf_bm": "",
+    "cfuvid": "",
+    "fp": ""
 }

@@ -6,7 +6,7 @@
         "disable_cover_highlights": "If true, the cover highlights image will not be downloaded. If false, the cover image will be downloaded.",
         "disable_folder_highlights": "If true, highlights will be downloaded without individual folders. If false, highlights will be organized in individual folders.",
         "disable_download_post_with_txt": "This option disables the Photos, Videos, Streams, and Archived folders and creates a Posts folder that puts everything inside it.",
-        "download_tagged_posts": "If true, posts containing specific tags (e.g., '@', '#adv', '#ad') will be downloaded. These posts will be saved in a separate 'Tag-Post' folder. If false, the downloader will skip such posts.",
+        "download_tagged_posts": "If true, posts containing specific tags (e.g. '#adv', '#ad') will be downloaded. These posts will be saved in a separate 'Tag-Post' folder. If false, the downloader will skip such posts.",
         "merge_tagged_media": "If true, and if 'download_tagged_posts' is also true, media from tagged posts (both photos and videos) will be saved directly within the 'Tag-Post' folder, without separate 'Photos' and 'Videos' subfolders. If false, the media will be organized into 'Photos' and 'Videos' subfolders inside the 'Tag-Post' folder.",
         "thread_worker_count": "Number of threads to use for concurrent downloads. Increase for faster downloads but might consume more resources."
     },
@@ -17,8 +17,9 @@
         "disable_cover_highlights": false,
         "disable_folder_highlights": false,
         "disable_download_post_with_txt": true,
-        "download_tagged_posts": false, 
+        "download_tagged_posts": false,
         "merge_tagged_media": false,
-        "thread_workers_count": 4
+        "download_labels": false,
+        "thread_workers_count": 5
     }
 }
