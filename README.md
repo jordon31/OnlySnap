@@ -11,6 +11,7 @@ You can literally **CLICK** on stuff now.
 
 It's stupid easy. Other tools out there require a PhD in coding to run; mine is built different. **EZ.** No complex garbage, just click and download.
 
+[![Screenshot-2026-02-09-050033.png](https://i.postimg.cc/ydF9WsrD/Screenshot-2026-02-09-050033.png)](https://postimg.cc/9RQzn522)
 ---
 
 ## HOW TO START (video for fast)
