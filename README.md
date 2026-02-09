@@ -61,4 +61,4 @@ You can change everything there. But if you are confused, here is what the butto
 ## 🔧 EXTRAS
 * **Credits:** Me. I built this while you were sleeping.
 * **Bugs:** It works on my machine. (any problem / suggestion open issues)
-**Disclaimer:** For educational purposes only (wink wink).
+* **Disclaimer:** For educational purposes only (wink wink).
