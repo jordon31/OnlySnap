@@ -11,6 +11,7 @@ You can literally **CLICK** on stuff now.
 
 It's stupid easy. Other tools out there require a PhD in coding to run; mine is built different. **EZ.** No complex garbage, just click and download.
 
+[![Screenshot-2026-02-09-050033.png](https://i.postimg.cc/ydF9WsrD/Screenshot-2026-02-09-050033.png)](https://postimg.cc/9RQzn522)
 ---
 
 ## HOW TO START (video for fast)
@@ -60,4 +61,4 @@ You can change everything there. But if you are confused, here is what the butto
 ## 🔧 EXTRAS
 * **Credits:** Me. I built this while you were sleeping.
 * **Bugs:** It works on my machine. (any problem / suggestion open issues)
-**Disclaimer:** For educational purposes only (wink wink).
+* **Disclaimer:** For educational purposes only (wink wink).
