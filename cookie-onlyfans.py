@@ -103,6 +103,14 @@ def main():
     if not os.path.exists(config_dir): 
         os.makedirs(config_dir)
 
+    config_file = os.path.join(config_dir, "Config.json")
+    config_example = os.path.join(config_dir, "Config.json.example")
+
+    if not os.path.exists(config_file) and os.path.exists(config_example):
+        try:
+            shutil.copy(config_example, config_file)
+        except: pass
+
     auth_file = os.path.join(config_dir, "Auth.json")
     auth_example = os.path.join(config_dir, "Auth.json.example")
     
