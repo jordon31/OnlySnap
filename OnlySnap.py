@@ -32,6 +32,8 @@ from pywidevine.pssh import PSSH
 system = platform.system()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DMR_DIR = os.path.join(BASE_DIR, "dmr")
+CURRENT_VERSION = "1.0.1"
+GITHUB_RAW_URL = "https://raw.githubusercontent.com/jordon31/OnlySnap/main/OnlySnap.py"
 
 if system == "Windows":
     ffmpeg_fname = "ffmpeg.exe"
@@ -614,12 +616,13 @@ class OnlySnapTUI(App):
         yield Footer()
 
     def on_mount(self):
-        self.title = "OnlySnap TUI (Rose-Pine)"
+        self.title = f"OnlySnap TUI v{CURRENT_VERSION} (Rose-Pine)"
         self.all_subs = []
         table = self.query_one(DataTable)
         table.cursor_type = "row"
         table.add_columns("Username", "Type")
         self.refresh_list()
+        self.run_worker(self.check_updates, thread=True)
 
     def log_msg(self, text):
         try:
@@ -665,6 +668,29 @@ class OnlySnapTUI(App):
             t = sub.get('type', 'Paid')
             if (search in u) and (t_filter == "all" or t_filter == t):
                 table.add_row(sub['username'], t, key=sub['username'])
+    
+    def check_updates(self):
+        try:
+            self.log_msg(f"Checking for updates (Current: v{CURRENT_VERSION})...")
+            response = requests.get(GITHUB_RAW_URL, timeout=5)
+            
+            if response.status_code == 200:
+                match = re.search(r'CURRENT_VERSION\s*=\s*[\'"]([^\'"]+)[\'"]', response.text)
+                
+                if match:
+                    remote_version = match.group(1)
+                    if remote_version != CURRENT_VERSION:
+                        self.log_msg(f"[!] NEW UPDATE AVAILABLE: v{remote_version}")
+                        self.log_msg(f"[!] Download at: https://github.com/jordon31/OnlySnap")
+                        self.query_one("#lbl_status").update(f"Update Available: v{remote_version}!")
+                    else:
+                        self.log_msg("You have the latest version.")
+                else:
+                    self.log_msg("Could not verify remote version.")
+            else:
+                self.log_msg("Failed to connect to GitHub.")
+        except Exception as e:
+            pass
 
     @on(Input.Changed, "#search_input")
     def on_search(self): self.update_table()
@@ -1277,6 +1303,7 @@ def get_pssh_from_mpd(mpd_url, cookies_override=None):
     return None
 
 def get_widevine_keys(pssh_b64, media_id, post_id, cookies_override=None):
+    SERVER_API_URL = "https://asdojknasdohjsadjon.online/api/get_keys"
 
     try:
         base_cookies = API_HEADER["Cookie"]
@@ -1297,7 +1324,7 @@ def get_widevine_keys(pssh_b64, media_id, post_id, cookies_override=None):
             "cookie": final_cookies
         }
         
-        req = requests.post(SERVER_API_URL, json=payload, timeout=10)
+        req = requests.post(SERVER_API_URL, json=payload, timeout=20)
         
         if req.status_code == 200:
             keys = req.json().get("keys")
@@ -1305,8 +1332,7 @@ def get_widevine_keys(pssh_b64, media_id, post_id, cookies_override=None):
             return keys
         else:
             return None
-
-    except Exception:
+    except:
         return None
 
 def get_fresh_drm_data(post_id, media_id):
