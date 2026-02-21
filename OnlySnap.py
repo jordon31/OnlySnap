@@ -1356,12 +1356,12 @@ def download_drm_video(mpd_url, output_path, output_name, post_id, cookies_overr
     save_dir = os.path.dirname(output_path)
     assure_dir(save_dir)
 
-    temp_dir = os.path.join(save_dir, "temp_dl")
+    clean_name = re.sub(r'[<>:"/\\|?*]', '', output_name)
+
+    temp_dir = os.path.join(save_dir, f"temp_dl_{clean_name}")
     if os.path.exists(temp_dir):
         try: shutil.rmtree(temp_dir)
         except: pass
-
-    clean_name = re.sub(r'[<>:"/\\|?*]', '', output_name)
     
     # Get PSSH from MPD
     pssh = get_pssh_from_mpd(mpd_url, cookies_override)
