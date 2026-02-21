@@ -28,10 +28,30 @@ from textual import on, work
 from textual.screen import Screen
 from textual.containers import Grid
 from pywidevine.pssh import PSSH
+from pywidevine import Cdm
+from pywidevine.device import Device, DeviceTypes
 
 system = platform.system()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DMR_DIR = os.path.join(BASE_DIR, "dmr")
+
+# Local Widevine CDM for DRM key retrieval
+LOCAL_CDM = None
+_cdm_client_id = os.path.join(DMR_DIR, "client_id.bin")
+_cdm_private_key = os.path.join(DMR_DIR, "private_key.pem")
+if os.path.isfile(_cdm_client_id) and os.path.isfile(_cdm_private_key):
+    try:
+        _device = Device(
+            type_=DeviceTypes.ANDROID,
+            security_level=3,
+            flags=None,
+            private_key=open(_cdm_private_key, "rb").read(),
+            client_id=open(_cdm_client_id, "rb").read()
+        )
+        LOCAL_CDM = Cdm.from_device(_device)
+    except Exception:
+        pass
+
 CURRENT_VERSION = "1.0.1"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/jordon31/OnlySnap/main/OnlySnap.py"
 
@@ -1324,16 +1344,55 @@ def get_widevine_keys(pssh_b64, media_id, post_id, cookies_override=None):
             "cookie": final_cookies
         }
         
+        log_debug(f"KEY REQUEST: media={media_id} post={post_id} pssh={pssh_b64[:40]}...")
         req = requests.post(SERVER_API_URL, json=payload, timeout=20)
-        
+
         if req.status_code == 200:
             keys = req.json().get("keys")
-            if not keys: return None
+            if not keys:
+                log_debug(f"KEY RESPONSE: media={media_id} status=200 but no keys in response: {req.text[:200]}")
+                return None
+            log_debug(f"KEY RESPONSE: media={media_id} keys obtained")
             return keys
         else:
+            log_debug(f"KEY RESPONSE: media={media_id} status={req.status_code} body={req.text[:200]}")
             return None
-    except:
+    except Exception as e:
+        log_debug(f"KEY EXCEPTION: media={media_id} error={e}")
         return None
+
+def get_local_widevine_keys(pssh_b64, media_id, message_id):
+    if not LOCAL_CDM:
+        return None
+    session_id = None
+    try:
+        session_id = LOCAL_CDM.open()
+        pssh_obj = PSSH(pssh_b64)
+        challenge = LOCAL_CDM.get_license_challenge(session_id, pssh_obj)
+        endpoint = f"/users/media/{media_id}/drm/message/{message_id}"
+        log_debug(f"LOCAL KEY REQUEST: media={media_id} msg={message_id} endpoint={endpoint}")
+        response = api_request(endpoint, postdata=challenge, getparams={"type": "widevine"})
+        if hasattr(response, 'content'):
+            license_data = response.content
+        elif isinstance(response, bytes):
+            license_data = response
+        else:
+            log_debug(f"LOCAL KEY FAILED: media={media_id} unexpected response type: {type(response)}")
+            return None
+        LOCAL_CDM.parse_license(session_id, license_data)
+        keys = LOCAL_CDM.get_keys(session_id, type_="CONTENT")
+        if not keys:
+            log_debug(f"LOCAL KEY FAILED: media={media_id} no content keys in license")
+            return None
+        key_str = " ".join(f"{key.kid.hex}:{key.key.hex()}" for key in keys)
+        log_debug(f"LOCAL KEY SUCCESS: media={media_id} keys obtained ({len(keys)} keys)")
+        return key_str
+    except Exception as e:
+        log_debug(f"LOCAL KEY EXCEPTION: media={media_id} error={e}")
+        return None
+    finally:
+        if session_id:
+            LOCAL_CDM.close(session_id)
 
 def get_fresh_drm_data(post_id, media_id):
     try:
@@ -1367,9 +1426,11 @@ def download_drm_video(mpd_url, output_path, output_name, post_id, cookies_overr
     pssh = get_pssh_from_mpd(mpd_url, cookies_override)
     keys = None
     
-    # Check server for keys
+    # Check server for keys, fall back to local CDM
     if pssh and post_id:
         keys = get_widevine_keys(pssh, clean_name, post_id, cookies_override)
+        if not keys and LOCAL_CDM:
+            keys = get_local_widevine_keys(pssh, clean_name, post_id)
     elif not post_id:
         log_debug("ERROR: Missing Post ID")
 
@@ -1400,7 +1461,15 @@ def download_drm_video(mpd_url, output_path, output_name, post_id, cookies_overr
     cmd.extend(["-H", f"Cookie: {dl_cookie}"])
     
     try:
-        process = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        log_debug(f"DRM DOWNLOAD START: media={clean_name} post={post_id}")
+        log_debug(f"CMD: {' '.join(cmd)}")
+        process = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        if process.stdout:
+            log_debug(f"N_m3u8DL-RE OUTPUT:\n{process.stdout}")
+        if process.returncode == 0:
+            log_debug(f"DRM DOWNLOAD SUCCESS: media={clean_name}")
+        else:
+            log_debug(f"DRM DOWNLOAD FAILED: media={clean_name} returncode={process.returncode}")
         return process.returncode == 0
     except Exception as e:
         log_debug(f"Subprocess exception: {e}")
