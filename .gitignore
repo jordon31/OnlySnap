@@ -3,3 +3,6 @@ Cache*
 Configs/OnlyFans/Auth.json
 Configs/OnlyFans/Config.json
 Configs/OnlyFans/user_id_cache.txt
+dmr/client_id.bin
+dmr/private_key.pem
+dmr/debug.log
