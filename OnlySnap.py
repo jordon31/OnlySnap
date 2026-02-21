@@ -32,6 +32,7 @@ from pywidevine.pssh import PSSH
 system = platform.system()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DMR_DIR = os.path.join(BASE_DIR, "dmr")
+DEBUG_FILE = os.path.join(DMR_DIR, "debug.log")
 CURRENT_VERSION = "1.0.1"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/jordon31/OnlySnap/main/OnlySnap.py"
 
@@ -427,7 +428,7 @@ class DownloadManager:
             self.log("------------------------------------------------")
             if new_files == 0:
                 self.log(f"NO NEW FILES TO DOWNLOAD.")
-                self.log(f"All {total_global_failes} files are already up to date.")
+                self.log(f"All {total_global_files} files are already up to date.")
             else:
                 self.log("SYNC COMPLETED.")
                 self.log(f"- Total files scanned: {total_global_files}")
