@@ -312,11 +312,28 @@ class DownloadManager:
                     cp = f"Profiles/{PROFILE}/Media/Chat/Photos/"
                     cv = f"Profiles/{PROFILE}/Media/Chat/Videos/"
                     for chat in chats_list:
+                        chat_post_id = str(chat.get("id", ""))
                         for media in chat.get("media", []):
-                            src = media.get("files", {}).get("full", {}).get("url")
+                            cf_cookies = None
+                            src = None
+                            files = media.get("files", {})
+
+                            if "drm" in files and files["drm"]:
+                                src = files["drm"].get("manifest", {}).get("dash")
+                                signature = files["drm"].get("signature", {}).get("dash", {})
+                                if signature:
+                                    p_cf = signature.get("CloudFront-Policy")
+                                    s_cf = signature.get("CloudFront-Signature")
+                                    k_cf = signature.get("CloudFront-Key-Pair-Id")
+                                    if p_cf and s_cf and k_cf:
+                                        cf_cookies = f"CloudFront-Policy={p_cf}; CloudFront-Signature={s_cf}; CloudFront-Key-Pair-Id={k_cf}"
+
+                            if not src:
+                                src = files.get("source", {}).get("url") or files.get("full", {}).get("url")
+
                             if src:
                                 p = cv if media['type'] == 'video' else cp
-                                futures.append(executor.submit(download_media, media, False, path=p, source_url=src))
+                                futures.append(executor.submit(download_media, media, False, path=p, source_url=src, post_id=chat_post_id, specific_cookies=cf_cookies))
 
                 # B. STORIES
                 if stories_list:
@@ -1389,7 +1406,8 @@ def download_drm_video(mpd_url, output_path, output_name, post_id, cookies_overr
         for k in keys.split():
             cmd.extend(["--key", k])
     else:
-        log_debug("WARNING: Downloading WITHOUT keys (File will be encrypted)")
+        log_debug("WARNING: No decryption keys available, skipping DRM download")
+        return False
 
     cmd.extend(["-H", f"User-Agent: {API_HEADER['User-Agent']}"])
     
@@ -1743,30 +1761,45 @@ def download_chats(chats):
     for chat in chats:
         if not isinstance(chat, dict):
             continue
-            
+
         text = chat.get("text", "").lower()
         if ("#adv" in text or "#ad" in text or "spin" in text or "#spins" in text or "#Advertisement" in text or "https://of.tv/" in text):
             continue
 
+        chat_post_id = str(chat.get("id", ""))
         media_items = chat.get("media", [])
         for media_item in media_items:
             media_type = media_item["type"]
+            files = media_item.get("files", {})
 
             source_url = None
-            if "full" in media_item["files"]:
-                source_url = media_item["files"]["full"].get("url")
-            elif "thumb" in media_item["files"]:
-                source_url = media_item["files"]["thumb"].get("url")
-            elif "preview" in media_item["files"]:
-                source_url = media_item["files"]["preview"].get("url")
-            elif "squarePreview" in media_item["files"]:
-                source_url = media_item["files"]["squarePreview"].get("url")
+            cf_cookies = None
+
+            if "drm" in files and files["drm"]:
+                source_url = files["drm"].get("manifest", {}).get("dash")
+                signature = files["drm"].get("signature", {}).get("dash", {})
+                if signature:
+                    p_cf = signature.get("CloudFront-Policy")
+                    s_cf = signature.get("CloudFront-Signature")
+                    k_cf = signature.get("CloudFront-Key-Pair-Id")
+                    if p_cf and s_cf and k_cf:
+                        cf_cookies = f"CloudFront-Policy={p_cf}; CloudFront-Signature={s_cf}; CloudFront-Key-Pair-Id={k_cf}"
+
+            if not source_url:
+                if "full" in files:
+                    source_url = files["full"].get("url")
+                elif "thumb" in files:
+                    source_url = files["thumb"].get("url")
+                elif "preview" in files:
+                    source_url = files["preview"].get("url")
+                elif "squarePreview" in files:
+                    source_url = files["squarePreview"].get("url")
 
             if source_url:
                 if media_type == "photo":
-                    photos_to_download.append((media_item, source_url))
+                    photos_to_download.append((media_item, source_url, chat_post_id, cf_cookies))
                 elif media_type == "video":
-                    videos_to_download.append((media_item, source_url))
+                    videos_to_download.append((media_item, source_url, chat_post_id, cf_cookies))
 
     if not photos_to_download and not videos_to_download:
         return
@@ -1780,14 +1813,14 @@ def download_chats(chats):
         if photos_to_download:
             photos_path = chat_path + "/Photos/"
             assure_dir(photos_path)
-            for media_item, source_url in photos_to_download:
-                futures.append(executor.submit(download_media, media_item, False, path=photos_path, source_url=source_url))
+            for media_item, source_url, post_id, cf_cookies in photos_to_download:
+                futures.append(executor.submit(download_media, media_item, False, path=photos_path, source_url=source_url, post_id=post_id, specific_cookies=cf_cookies))
 
         if videos_to_download:
             videos_path = chat_path + "/Videos/"
             assure_dir(videos_path)
-            for media_item, source_url in videos_to_download:
-                futures.append(executor.submit(download_media, media_item, False, path=videos_path, source_url=source_url))
+            for media_item, source_url, post_id, cf_cookies in videos_to_download:
+                futures.append(executor.submit(download_media, media_item, False, path=videos_path, source_url=source_url, post_id=post_id, specific_cookies=cf_cookies))
 
         for future in as_completed(futures):
             future.result()
