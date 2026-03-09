@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.3] - 2026-03-09
+
+### Fixed
+- **Chats DRM:** Fixed and now full supported
+
+--------------------------------------------
 ## [1.0.2] - 2026-02-25
 
 ### Added
