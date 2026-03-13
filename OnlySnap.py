@@ -18,6 +18,7 @@ import threading
 import base64
 import logging
 import asyncio
+import webbrowser
 from datetime import date
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from colorama import init, Fore, Style
@@ -28,6 +29,7 @@ from textual import on, work
 from textual.screen import Screen
 from textual.containers import Grid
 from pywidevine.pssh import PSSH
+from PIL import Image, ImageDraw, ImageFont
 
 system = platform.system()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -37,7 +39,7 @@ DMR_DIR = os.path.join(BASE_DIR, "dmr")
 DEBUG_MODE = False 
 DEBUG_FILE = os.path.join(DMR_DIR, "debug.log")
 
-CURRENT_VERSION = "1.0.3"
+CURRENT_VERSION = "1.0.4"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/jordon31/OnlySnap/main/OnlySnap.py"
 
 if system == "Windows":
@@ -143,24 +145,28 @@ class DownloadManager:
             photo_posts = read_from_cache(PROFILE_ID, "photos") or []
             if not photo_posts: 
                 raw = api_request(f"/users/{PROFILE_ID}/posts/photos", getdata={"limit": "999999"})
+                if isinstance(raw, dict) and 'list' in raw: raw = raw['list']
                 photo_posts = get_all_photos(raw)
                 update_profile_cache(PROFILE_ID, "photos", photo_posts)
             
             video_posts = read_from_cache(PROFILE_ID, "videos") or []
             if not video_posts:
                 raw = api_request(f"/users/{PROFILE_ID}/posts/videos", getdata={"limit": "999999"})
+                if isinstance(raw, dict) and 'list' in raw: raw = raw['list']
                 video_posts = get_all_videos(raw)
                 update_profile_cache(PROFILE_ID, "videos", video_posts)
 
             archived_posts = read_from_cache(PROFILE_ID, "archived") or []
             if not archived_posts:
                 raw = api_request(f"/users/{PROFILE_ID}/posts/archived", getdata={"limit": "999999"})
+                if isinstance(raw, dict) and 'list' in raw: raw = raw['list']
                 archived_posts = get_all_archived(raw)
                 update_profile_cache(PROFILE_ID, "archived", archived_posts)
             
             stream_posts = read_from_cache(PROFILE_ID, "streams") or []
             if not stream_posts:
                 raw = api_request(f"/users/{PROFILE_ID}/posts/streams", getdata={"limit": "999999"})
+                if isinstance(raw, dict) and 'list' in raw: raw = raw['list'] 
                 stream_posts = get_all_streams(raw)
                 update_profile_cache(PROFILE_ID, "streams", stream_posts)
 
@@ -488,8 +494,6 @@ class SettingsScreen(Screen):
     }
     
     .setting_label { color: #ebbcba; margin-top: 1; }
-    Button#btn_save { background: #31748f; color: #e0def4; margin-top: 2; width: 100%; }
-    Button#btn_cancel { background: #eb6f92; color: #e0def4; margin-top: 1; width: 100%; }
     """
 
     def compose(self) -> ComposeResult:
@@ -497,8 +501,14 @@ class SettingsScreen(Screen):
         s = config.get("settings", {})
         
         with Container(id="settings_container"):
-            yield Label("SETTINGS EDITOR", classes="info_sub")
-            
+            yield Label("SETTINGS EDITOR (Press ESC to close)", classes="info_sub")
+
+            # --- Text Options ---
+            yield Label("Custom Filename Prefix:", classes="setting_label")
+            yield Input(value=str(s.get("custom_filename_prefix", "")), id="custom_filename_prefix")
+
+            yield Label("Watermark Text (leave it blank so u dont put it):", classes="setting_label")
+            yield Input(value=str(s.get("watermark_text", "")), id="watermark_text")
             # --- Boolean Options ---
             yield Label("Use Month Names (Jan, Feb...):", classes="setting_label")
             yield Select([("Yes", "true"), ("No", "false")], value=str(s.get("use_month_names")).lower(), id="use_month_names")
@@ -530,40 +540,55 @@ class SettingsScreen(Screen):
             # --- Integer Option ---
             yield Label("Download Threads (Speed):", classes="setting_label")
             yield Input(value=str(s.get("thread_workers_count", 5)), id="thread_workers_count")
-
-            yield Button("SAVE SETTINGS", id="btn_save")
-            yield Button("EXIT", id="btn_cancel")
-
-    @on(Button.Pressed, "#btn_save")
-    def action_save(self):
-        config = load_config()
-        s = config["settings"]
-
-        # Update boolean values
-        s["use_month_names"] = self.query_one("#use_month_names").value == "true"
-        s["use_month_numbers"] = self.query_one("#use_month_numbers").value == "true"
-        s["no_year_folders"] = self.query_one("#no_year_folders").value == "true"
-        s["disable_cover_highlights"] = self.query_one("#disable_cover_highlights").value == "true"
-        s["disable_folder_highlights"] = self.query_one("#disable_folder_highlights").value == "true"
-        s["disable_download_post_with_txt"] = self.query_one("#disable_download_post_with_txt").value == "true"
-        s["download_tagged_posts"] = self.query_one("#download_tagged_posts").value == "true"
-        s["merge_tagged_media"] = self.query_one("#merge_tagged_media").value == "true"
-        s["download_labels"] = self.query_one("#download_labels").value == "true"
-
-        # Update integer value
-        try:
-            val = int(self.query_one("#thread_workers_count").value)
-            s["thread_workers_count"] = val
-        except:
-            pass
-
-        save_config(config)
-        self.app.pop_screen()
-        self.app.query_one(Log).write_line("[*] Settings updated successfully.")
-
-    @on(Button.Pressed, "#btn_cancel")
+            
     def action_cancel(self):
         self.app.pop_screen()
+
+    # --- AUTO-SAVE LOGIC ---
+    @on(Select.Changed)
+    def on_select_change(self, event: Select.Changed):
+        self.esegui_auto_save()
+
+    @on(Input.Changed)
+    def on_input_change(self, event: Input.Changed):
+        self.esegui_auto_save()
+
+    def esegui_auto_save(self):
+        try:
+            config = load_config()
+            s = config["settings"]
+
+            s["use_month_names"] = self.query_one("#use_month_names").value == "true"
+            s["use_month_numbers"] = self.query_one("#use_month_numbers").value == "true"
+            s["no_year_folders"] = self.query_one("#no_year_folders").value == "true"
+            s["disable_cover_highlights"] = self.query_one("#disable_cover_highlights").value == "true"
+            s["disable_folder_highlights"] = self.query_one("#disable_folder_highlights").value == "true"
+            s["disable_download_post_with_txt"] = self.query_one("#disable_download_post_with_txt").value == "true"
+            s["download_tagged_posts"] = self.query_one("#download_tagged_posts").value == "true"
+            s["merge_tagged_media"] = self.query_one("#merge_tagged_media").value == "true"
+            s["download_labels"] = self.query_one("#download_labels").value == "true"
+
+            try:
+                s["custom_filename_prefix"] = self.query_one("#custom_filename_prefix").value.strip()
+            except:
+                pass
+
+            try:
+                s["watermark_text"] = self.query_one("#watermark_text").value.strip()
+            except:
+                pass
+
+            try:
+                val = self.query_one("#thread_workers_count").value.strip()
+                if val.isdigit() and val != "":
+                    s["thread_workers_count"] = int(val)
+            except:
+                pass
+
+            save_config(config)
+            
+        except Exception as e:
+            pass
         
 class OnlySnapTUI(App):
     CSS = """
@@ -611,6 +636,11 @@ class OnlySnapTUI(App):
     #btn_dl { background: #31748f; color: #e0def4; }
     #btn_stop { background: #eb6f92; color: #e0def4; margin-right: 0; }
 
+    #bottom_buttons { height: auto; margin-top: 1; }
+    #bottom_buttons > Button { width: 1fr; }
+    #btn_settings { margin-right: 1; }
+    #btn_telegram { background: #28a8ea; color: #191724; text-style: bold; }
+
     Log { 
         width: 100%; 
         height: 1fr; 
@@ -630,7 +660,11 @@ class OnlySnapTUI(App):
             yield Select([("All", "all"), ("Paid", "Paid"), ("Free", "Free"), ("Trial", "Trial")], value="all", id="filter_type")
             yield DataTable(id="users_table")
             yield Button("Refresh List", id="btn_refresh")
-            yield Button("Settings", id="btn_settings")
+            
+            with Horizontal(id="bottom_buttons"):
+                yield Button("Settings", id="btn_settings")
+                yield Button("Telegram", id="btn_telegram")
+                
         with Container(id="main_panel"):
             with Vertical(id="info_box"):
                 yield Label("Select a creator from the list", id="lbl_user")
@@ -762,6 +796,13 @@ class OnlySnapTUI(App):
     @on(Button.Pressed, "#btn_settings")
     def open_settings(self):
         self.push_screen(SettingsScreen())
+
+    @on(Button.Pressed, "#btn_telegram")
+    def open_telegram(self):
+        try:
+            webbrowser.open("https://t.me/OnlySnap0")
+        except:
+            pass
 
     def download_task(self):
         try:
@@ -1492,10 +1533,90 @@ def get_year_path(post_date):
     folder_prefix = str(post_year)
     return folder_prefix
 
+def apply_text_watermark(image_path, text): #watermark
+    if not text:
+        return
+    try:
+        with Image.open(image_path) as img:
+            img = img.convert("RGBA")
+            width, height = img.size
+            
+            # text size
+            target_font_size = max(int(height * 0.022), 12)
+            
+            try:
+                font = ImageFont.truetype("font.ttf", target_font_size) #font.. u can change it however u want
+            except IOError:
+                try:
+                    font = ImageFont.truetype("arial.ttf", target_font_size)
+                except IOError:
+                    font = ImageFont.load_default()
+
+            txt_overlay = Image.new('RGBA', img.size, (255, 255, 255, 0))
+            draw = ImageDraw.Draw(txt_overlay)
+            
+            try:
+                bbox = draw.textbbox((0, 0), text, font=font)
+                tw = bbox[2] - bbox[0]
+                th = bbox[3] - bbox[1]
+            except AttributeError:
+                tw, th = draw.textsize(text, font=font)
+
+            padding_x = int(target_font_size * 0.3)
+            padding_y = int(target_font_size * 0.2)
+            
+            margin_x = int(width * 0.01) 
+            margin_y = max(int(height * 0.009), 5)
+            
+            x = margin_x + padding_x
+            y = height - th - padding_y - margin_y
+            
+            try:
+                abs_bbox = draw.textbbox((x, y), text, font=font)
+            except AttributeError:
+                abs_bbox = (x, y, x + tw, y + th)
+
+            rect_coords = [
+                abs_bbox[0] - padding_x, 
+                abs_bbox[1] - padding_y, 
+                abs_bbox[2] + padding_x, 
+                abs_bbox[3] + padding_y
+            ]
+            
+            #black background
+            draw.rectangle(rect_coords, fill=(0, 0, 0, 76))
+            
+            #height
+            shadow_offset = max(1, int(target_font_size * 0.06))
+            
+            #shadow
+            draw.text((x + shadow_offset, y + shadow_offset), text, font=font, fill=(0, 0, 0, 200))
+            
+            #change color
+            draw.text((x, y), text, font=font, fill=(90, 55, 130, 255))
+            
+            out = Image.alpha_composite(img, txt_overlay)
+            out = out.convert("RGB")
+            out.save(image_path, format="JPEG", quality=100, subsampling=0)
+            
+    except Exception as e:
+        pass
+
 # download a media item and save it to the relevant directory
 def download_media(media, is_archived, path=None, timestamp=None, is_stream=False, source_url=None, post_id=None, specific_cookies=None, is_chat=False):
     global new_files
     id_str = str(media["id"])
+    
+    config = load_config()
+    custom_prefix = config.get("settings", {}).get("custom_filename_prefix", "").strip()
+    watermark_text = config.get("settings", {}).get("watermark_text", "").strip()
+    
+    if custom_prefix:
+        file_base_name = f"{custom_prefix}_{id_str}"
+    else:
+        file_base_name = id_str
+    # ------------------------------
+
     source = source_url if source_url else media.get("source", {}).get("source")
 
     if (media["type"] != "photo" and media["type"] != "video" and media["type"] != "gif") or not media['canView']:
@@ -1529,19 +1650,19 @@ def download_media(media, is_archived, path=None, timestamp=None, is_stream=Fals
 
     if path is None:
         if is_stream:
-            final_path = f"Profiles/{PROFILE}/Media/Streams/{id_str}{ext}"
+            final_path = f"Profiles/{PROFILE}/Media/Streams/{file_base_name}{ext}"
         elif is_archived:
             sub_folder = "Photos" if media["type"] == "photo" else "Videos"
-            final_path = f"Profiles/{PROFILE}/Media/Archived/{sub_folder}/{id_str}{ext}"
+            final_path = f"Profiles/{PROFILE}/Media/Archived/{sub_folder}/{file_base_name}{ext}"
         else:
             folder_name = get_year_folder(timestamp, "photo" if media["type"] == "photo" else "video")
             type_f = "!Photos" if media["type"] == "photo" else "!Videos"
-            final_path = f"Profiles/{PROFILE}/Media/{type_f}/{folder_name}/{id_str}{ext}"
+            final_path = f"Profiles/{PROFILE}/Media/{type_f}/{folder_name}/{file_base_name}{ext}"
     else:
         if path.startswith("/"):
-            final_path = f"Profiles/{PROFILE}{path}{id_str}{ext}"
+            final_path = f"Profiles/{PROFILE}{path}{file_base_name}{ext}"
         else:
-            final_path = f"{path}{id_str}{ext}"
+            final_path = f"{path}{file_base_name}{ext}"
     
     if os.path.isfile(final_path):
         return False
@@ -1565,7 +1686,7 @@ def download_media(media, is_archived, path=None, timestamp=None, is_stream=Fals
     
     success = False
     if is_drm:
-        if download_drm_video(source, final_path, id_str, post_id, specific_cookies, is_chat):
+        if download_drm_video(source, final_path, file_base_name, post_id, specific_cookies, is_chat):
             new_files += 1
             success = True
     else:
@@ -1575,6 +1696,8 @@ def download_media(media, is_archived, path=None, timestamp=None, is_stream=Fals
             success = True
             if (media["type"] == "video" or media["type"] == "gif") and not final_path.endswith(".mp4"):
                 convert_to_mp4(final_path)
+            elif media["type"] == "photo":
+                apply_text_watermark(final_path, watermark_text)
 
     return success
 
@@ -1944,8 +2067,10 @@ def get_all_photos(images):
             ) for _ in range(8)]
             
             for future in as_completed(futures):
-                extra_img_posts = future.result()
-                images.extend(extra_img_posts)
+                        extra_img_posts = future.result()
+                        if isinstance(extra_img_posts, dict) and 'list' in extra_img_posts:
+                            extra_img_posts = extra_img_posts['list']                        
+                        images.extend(extra_img_posts)
             
             has_more_images = any(len(future.result()) > 0 for future in futures)
     return images
@@ -2067,7 +2192,7 @@ def get_all_chats():
         for chat in chats:
             text = chat.get("text", "").lower()
             # anti spam
-            if any(x in text for x in ["#adv", "#ad", "spin", "of.tv/","#Advertisement"]):
+            if any(x in text for x in ["#adv", "#ad", "spin", "of.tv/","#Advertisement", "of.tv"]):
                 continue
             all_chats.append(chat)
 
