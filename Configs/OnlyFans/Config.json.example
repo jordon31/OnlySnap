@@ -8,7 +8,9 @@
         "disable_download_post_with_txt": "This option disables the Photos, Videos, Streams, and Archived folders and creates a Posts folder that puts everything inside it.",
         "download_tagged_posts": "If true, posts containing specific tags (e.g. '#adv', '#ad') will be downloaded. These posts will be saved in a separate 'Tag-Post' folder. If false, the downloader will skip such posts.",
         "merge_tagged_media": "If true, and if 'download_tagged_posts' is also true, media from tagged posts (both photos and videos) will be saved directly within the 'Tag-Post' folder, without separate 'Photos' and 'Videos' subfolders. If false, the media will be organized into 'Photos' and 'Videos' subfolders inside the 'Tag-Post' folder.",
-        "thread_worker_count": "Number of threads to use for concurrent downloads. Increase for faster downloads but might consume more resources."
+        "thread_worker_count": "Number of threads to use for concurrent downloads. Increase for faster downloads but might consume more resources.",
+        "custom_filename_prefix": "Adds a custom prefix to downloaded files (e.g., '@MyChannel_'). If empty, original IDs are used. WARNING: Changing this will cause redownloads of existing files.",
+        "watermark_text": "Text to be applied as a watermark on photos. If empty, no watermark is added. Supports custom .ttf fonts in the root directory."
     },
     "settings": {
         "use_month_names": false,
@@ -20,6 +22,8 @@
         "download_tagged_posts": false,
         "merge_tagged_media": false,
         "download_labels": false,
-        "thread_workers_count": 5
+        "thread_workers_count": 5,
+        "custom_filename_prefix": "",
+        "watermark_text": ""
     }
 }
