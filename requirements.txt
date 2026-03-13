@@ -2,3 +2,4 @@ textual
 requests
 colorama
 pywidevine
+pillow
