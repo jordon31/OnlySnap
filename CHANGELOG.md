@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.4] - 2026-03-13
+
+### Fixed 
+- **API Adaptation:** Updated the downloader to handle the recent OnlyFans API change. Photo post responses shifted from arrays to objects ({"list": [...]}); the script now correctly parses the new format to prevent skipped downloads.
+
+### Added 
+- **Dynamic Text Watermark:** New feature to automatically apply a customizable watermark to photos. It auto-detects resolution to ensure perfect scaling and includes a subtle semi-transparent background for readability.
+- **Custom Filename Prefix:** Added the ability to set a personalized prefix (e.g., @YourTag or any) for all downloaded files directly from the settings.
+- **New Dependency:** Added `Pillow` (PIL) 
+--------------------------------------------
 ## [1.0.3] - 2026-03-09
 
 ### Fixed
