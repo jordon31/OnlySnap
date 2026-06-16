@@ -7,14 +7,16 @@ echo ==========================================
 echo      ONLYSNAP DASHBOARD
 echo ==========================================
 echo 1) Run OnlySnap
-echo 2) Auto paste cookie (OnlyFans)
+echo 2) Install Requirements
 echo 3) Install DRM Tools (FFmpeg, MP4Decrypt, RE)
+echo 4) Add to PATH (use "onlyfans" / "patreon" from anywhere)
 echo.
-set /p choice=Select option (1, 2 or 3): 
+set /p choice=Select option (1, 2, 3 or 4): 
 
 if "%choice%"=="1" goto op1
 if "%choice%"=="2" goto op2
 if "%choice%"=="3" goto op3
+if "%choice%"=="4" goto op4
 goto menu
 
 :op1
@@ -23,7 +25,12 @@ pause
 goto menu
 
 :op2
-python cookie-onlyfans.py
+cls
+echo Installing Python requirements...
+echo ----------------------------------------
+pip install -r Site\requirements.txt
+echo.
+echo Done!
 pause
 goto menu
 
@@ -52,6 +59,77 @@ if exist "dmr\ffmpeg.exe" (
 ) else (
     echo ERROR: Download failed. Check your internet.
 )
+echo ==========================================
+pause
+goto menu
+
+:op4
+cls
+echo ==========================================
+echo   ADD ONLYSNAP COMMANDS TO PATH
+echo ==========================================
+echo.
+echo This will create "onlyfans" and "patreon" commands
+echo that work from ANY folder, ANY drive.
+echo.
+echo If you move OnlySnap, just run this option again!
+echo ==========================================
+echo.
+
+set "BIN_DIR=%USERPROFILE%\.onlysnap\bin"
+set "SITE_DIR=%~dp0Site"
+
+if not exist "%BIN_DIR%" mkdir "%BIN_DIR%"
+
+echo Creating "onlyfans" command...
+(
+echo @echo off
+echo cd /d "%SITE_DIR%"
+echo python "%SITE_DIR%\OnlyFans.py" %%*
+echo pause
+) > "%BIN_DIR%\onlyfans.bat"
+
+echo Creating "patreon" command...
+(
+echo @echo off
+echo cd /d "%SITE_DIR%"
+echo python "%SITE_DIR%\Patreon.py" %%*
+echo pause
+) > "%BIN_DIR%\patreon.bat"
+
+echo Creating "onlysnap" command...
+(
+echo @echo off
+echo cd /d "%~dp0"
+echo python "%~dp0OnlySnap.py" %%*
+echo pause
+) > "%BIN_DIR%\onlysnap.bat"
+
+REM Check if already in PATH
+echo %PATH% | findstr /I /C:"%BIN_DIR%" >nul 2>&1
+if %errorlevel% neq 0 (
+    echo.
+    echo Adding to PATH...
+    setx PATH "%PATH%;%BIN_DIR%" >nul 2>&1
+    if %errorlevel% equ 0 (
+        echo PATH updated successfully!
+    ) else (
+        echo ERROR: Could not update PATH. Try running as Administrator.
+    )
+) else (
+    echo PATH already contains OnlySnap bin folder.
+)
+
+echo.
+echo ==========================================
+echo   DONE! Commands registered:
+echo.
+echo   onlyfans   - Launch OnlyFans scraper
+echo   patreon    - Launch Patreon scraper
+echo   onlysnap   - Launch OnlySnap Hub
+echo.
+echo   Open a NEW terminal to use them.
+echo   If you move the folder, run option 4 again.
 echo ==========================================
 pause
 goto menu
