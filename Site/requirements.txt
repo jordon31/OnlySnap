@@ -1,0 +1,6 @@
+textual
+requests
+colorama
+pywidevine
+pillow
+curl_cffi
