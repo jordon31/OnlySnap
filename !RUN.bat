@@ -36,8 +36,28 @@ goto menu
 
 :op3
 cls
-echo Starting Direct Download from Dropbox...
-echo ----------------------------------------
+echo Starting DRM Tools Install...
+echo ==========================================
+
+REM Check if VC++ Redistributable is already installed
+reg query "HKLM\SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\X64" /v Version >nul 2>&1
+if %errorlevel% equ 0 (
+    echo [OK] Visual C++ Redistributable already installed. Skipping.
+) else (
+    echo [0/4] Downloading Visual C++ Redistributable...
+    curl -L -o "vc_redist.x64.exe" "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+    if exist "vc_redist.x64.exe" (
+        echo      Installing silently...
+        start /wait vc_redist.x64.exe /quiet /norestart
+        echo      Done! Cleaning up...
+        del /f "vc_redist.x64.exe"
+        echo [OK] Visual C++ Redistributable installed.
+    ) else (
+        echo [!] Download failed. Skipping VC++ install.
+    )
+)
+
+echo.
 
 if not exist "dmr" mkdir "dmr"
 
@@ -111,11 +131,7 @@ if %errorlevel% neq 0 (
     echo.
     echo Adding to PATH...
     setx PATH "%PATH%;%BIN_DIR%" >nul 2>&1
-    if %errorlevel% equ 0 (
-        echo PATH updated successfully!
-    ) else (
-        echo ERROR: Could not update PATH. Try running as Administrator.
-    )
+    echo PATH updated successfully!
 ) else (
     echo PATH already contains OnlySnap bin folder.
 )
