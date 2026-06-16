@@ -20,7 +20,7 @@ if "%choice%"=="4" goto op4
 goto menu
 
 :op1
-python OnlySnap.py
+py OnlySnap.py
 pause
 goto menu
 
@@ -28,7 +28,7 @@ goto menu
 cls
 echo Installing Python requirements...
 echo ----------------------------------------
-pip install -r Site\requirements.txt
+py -m pip install -r Site\requirements.txt
 echo.
 echo Done!
 pause
