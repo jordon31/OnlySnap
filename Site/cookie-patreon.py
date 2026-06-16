@@ -214,41 +214,54 @@ def auto_scrape():
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        print("Installing Playwright...")
+        print("Installing Playwright (pip only, using your browser)...")
         os.system(f'"{sys.executable}" -m pip install playwright')
-        os.system(f'"{sys.executable}" -m playwright install chromium firefox')
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
-            print("❌ Playwright install failed. Use clipboard mode.")
+            print("❌ Playwright install failed.")
             return None
 
     browser_name, browser_path, user_data = detect_browser()
     if not browser_path:
-        print("❌ No supported browser found.")
-        return None
+        print("⚠️  No supported browser found. Downloading Playwright Chromium...")
+        os.system(f'"{sys.executable}" -m playwright install chromium')
+        browser_name = "Chromium (Playwright)"
+        browser_path = None
+        user_data = None
 
     is_firefox = browser_name == "Firefox"
+    use_playwright_browser = browser_path is None
 
-    if is_browser_running(browser_name):
+    if not use_playwright_browser and is_browser_running(browser_name):
         print(f"\n⚠️  {browser_name} is open. Close it first to use your profile.")
         input("   Press ENTER after closing the browser...")
         if is_browser_running(browser_name):
             print(f"❌ {browser_name} is still running. Aborting.")
             return None
 
-    print(f"\n🌐 Opening {browser_name} (your profile)...")
+    print(f"\n🌐 Opening {browser_name}...")
     print("   Reading cookies after page load...\n")
 
     captured = {}
 
     with sync_playwright() as p:
         try:
-            if is_firefox:
+            if use_playwright_browser:
+                import tempfile
+                tmp_dir = tempfile.mkdtemp()
+                context = p.chromium.launch_persistent_context(
+                    tmp_dir,
+                    headless=False,
+                    viewport={"width": 1280, "height": 800},
+                    args=["--disable-blink-features=AutomationControlled"],
+                    ignore_default_args=["--enable-automation"]
+                )
+            elif is_firefox:
                 context = p.firefox.launch_persistent_context(
                     user_data,
                     executable_path=browser_path,
-                    headless=False,
+                    headless=False, #captcha
                     viewport={"width": 1280, "height": 800},
                 )
             else:

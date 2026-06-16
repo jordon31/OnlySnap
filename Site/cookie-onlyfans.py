@@ -265,7 +265,6 @@ def is_browser_running(browser_name):
             return False
 
 def auto_scrape():
-    # Headless server: no GUI available
     if is_headless_server():
         print("❌ No display server detected (headless server).")
         print("   Use clipboard mode or add cookies manually to Auth.json.")
@@ -274,23 +273,26 @@ def auto_scrape():
     try:
         from playwright.sync_api import sync_playwright
     except ImportError:
-        print("Installing Playwright...")
+        print("Installing Playwright (pip only, using your browser)...")
         os.system(f'"{sys.executable}" -m pip install playwright')
-        os.system(f'"{sys.executable}" -m playwright install chromium firefox')
         try:
             from playwright.sync_api import sync_playwright
         except ImportError:
-            print("❌ Playwright install failed. Use clipboard mode.")
+            print("❌ Playwright install failed.")
             return None
 
     browser_name, browser_path, user_data = detect_browser()
     if not browser_path:
-        print("❌ No supported browser found.")
-        return None
+        print("⚠️  No supported browser found. Downloading Playwright Chromium...")
+        os.system(f'"{sys.executable}" -m playwright install chromium')
+        browser_name = "Chromium (Playwright)"
+        browser_path = None  # Playwright will use its own
+        user_data = None
 
     is_firefox = browser_name == "Firefox"
+    use_playwright_browser = browser_path is None
 
-    if is_browser_running(browser_name):
+    if not use_playwright_browser and is_browser_running(browser_name):
         print(f"\n⚠️  {browser_name} is open. Close it first to use your profile.")
         input("   Press ENTER after closing the browser...")
         if is_browser_running(browser_name):
@@ -299,12 +301,23 @@ def auto_scrape():
 
     captured = {}
 
-    print(f"\n🌐 Opening {browser_name} (your profile)...")
+    print(f"\n🌐 Opening {browser_name}...")
     print("   Reading cookies after page load...\n")
 
     with sync_playwright() as p:
         try:
-            if is_firefox:
+            if use_playwright_browser:
+                # Fallback: use Playwright's own Chromium (no user profile)
+                import tempfile
+                tmp_dir = tempfile.mkdtemp()
+                context = p.chromium.launch_persistent_context(
+                    tmp_dir,
+                    headless=False,
+                    viewport={"width": 1280, "height": 800},
+                    args=["--disable-blink-features=AutomationControlled"],
+                    ignore_default_args=["--enable-automation"]
+                )
+            elif is_firefox:
                 context = p.firefox.launch_persistent_context(
                     user_data,
                     executable_path=browser_path,
@@ -375,11 +388,41 @@ def auto_scrape():
                                     break
                     except: pass
                 
+                # Capture x-hash from API requests
+                x_hash = ""
+                captured_headers = {}
+                
+                def on_request(request):
+                    nonlocal x_hash, captured_headers
+                    url = request.url
+                    if "onlyfans.com/api2/" in url and not x_hash:
+                        headers = request.headers
+                        if headers.get("x-hash"):
+                            x_hash = headers["x-hash"]
+                            captured_headers = headers
+                
+                page.on("request", on_request)
+                
+                # Trigger an API call to capture x-hash
+                print("   Waiting for API request to capture x-hash...")
+                try:
+                    page.goto("https://onlyfans.com/my/chats/", wait_until="networkidle", timeout=10000)
+                except:
+                    pass
+                
+                # Wait a bit for any XHR to fire
+                time.sleep(2)
+                
+                if x_hash:
+                    print(f"   ✅ x-hash: {x_hash[:25]}...")
+                else:
+                    print("   ⚠️ x-hash not captured (will be empty — script may still work)")
+                
                 captured = {
                     "user-agent": page.evaluate("() => navigator.userAgent"),
                     "user-id": cookie_dict.get("auth_id", ""),
                     "x-bc": cookie_dict.get("fp", ""),
-                    "x-hash": "",
+                    "x-hash": x_hash,
                     "x-of-rev": x_of_rev,
                     "cookie": cookie_str,
                 }
