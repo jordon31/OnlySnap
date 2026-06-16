@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.6] - 2026-06-16
+
+### Added
+- **Patreon Full Integration:** Complete Patreon downloader TUI (`Patreon.py`) with creator list, collection/feed sync, caching, and parallel downloads.
+- **Auto Cookie Scrape:** Both OnlyFans and Patreon now have auto cookie scrapers (`cookie-onlyfans.py`, `cookie-patreon.py`) that open your actual browser profile, grab cookies, and save them to `Auth.json` automatically. No more manual copy-paste from DevTools.
+- **Multi-Browser Support:** Auto-detects and supports Chrome, Brave, Edge, Opera, Opera GX, Firefox, and Vivaldi on Windows, macOS, and Linux. Opens your real browser profile (not a new one).
+- **Linux / macOS Launcher:** New `run.sh` script with the same 4 options as `!RUN.bat`. DRM tools install via package managers (Homebrew on macOS, apt/dnf/pacman/apk on Linux) and GitHub releases.
+- **PATH Commands (Option 4):** Register `onlyfans`, `patreon`, and `onlysnap` as global terminal commands. Works from any folder, any drive. Re-run Option 4 after moving the project folder to update paths.
+- **Patreon SPAM LIKE:** Auto-like all viewable posts from a creator. Skips locked posts and already-liked posts. Button only appears when `x-csrf-signature` is set in Auth.json. Stops immediately on rate limit (429).
+- **Auto Update Check:** Both `OnlyFans.py` and `Patreon.py` check for updates on startup by comparing local version with GitHub.
+- **Centralized Versioning:** `OnlyFans.py` and `Patreon.py` dynamically read `CURRENT_VERSION` and `GITHUB_RAW_URL` from the main `OnlySnap.py` — change it in one place.
+- **Dependency Management:** New `Site/requirements.txt` file. `!RUN.bat` Option 2 replaced "Auto Paste" with "Install Requirements" (`pip install -r`).
+- **DRM Tools Installer:** Option 3 downloads FFmpeg, mp4decrypt (Bento4), and N_m3u8DL-RE with correct URLs per platform and architecture (x64/arm64).
+- **Headless / Server Mode:** Cookie scripts auto-detect headless Linux (no GUI) and prompt for manual cookie input in the terminal.
+- **Browser Close Detection:** Added `is_browser_running()` check using `tasklist` (Windows) / `pgrep` (Linux/macOS) before launching cookie scrape to prevent profile lock conflicts.
+
+### Changed
+- **`!RUN.bat` Overhauled:** Now has 4 options (Run, Install Requirements, DRM Tools, Add to PATH) instead of the old 2-option layout.
+- **README.md Rewritten:** Full documentation covering all features, browser support table, project structure, and setup for all platforms.
+
+--------------------------------------------
 ## [1.0.5] - 2026-03-27
 
 ### Fixed
