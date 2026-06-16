@@ -105,7 +105,7 @@ echo Creating "onlyfans" command...
 (
 echo @echo off
 echo cd /d "%SITE_DIR%"
-echo python "%SITE_DIR%\OnlyFans.py" %%*
+echo py "%SITE_DIR%\OnlyFans.py" %%*
 echo pause
 ) > "%BIN_DIR%\onlyfans.bat"
 
@@ -113,7 +113,7 @@ echo Creating "patreon" command...
 (
 echo @echo off
 echo cd /d "%SITE_DIR%"
-echo python "%SITE_DIR%\Patreon.py" %%*
+echo py "%SITE_DIR%\Patreon.py" %%*
 echo pause
 ) > "%BIN_DIR%\patreon.bat"
 
@@ -121,17 +121,16 @@ echo Creating "onlysnap" command...
 (
 echo @echo off
 echo cd /d "%~dp0"
-echo python "%~dp0OnlySnap.py" %%*
+echo py "%~dp0OnlySnap.py" %%*
 echo pause
 ) > "%BIN_DIR%\onlysnap.bat"
 
-REM Check if already in PATH
+REM Safely add to user PATH using PowerShell (avoids 1024 char truncation)
 echo %PATH% | findstr /I /C:"%BIN_DIR%" >nul 2>&1
 if %errorlevel% neq 0 (
     echo.
     echo Adding to PATH...
-    setx PATH "%PATH%;%BIN_DIR%" >nul 2>&1
-    echo PATH updated successfully!
+    powershell -NoProfile -Command "$userPath = [Environment]::GetEnvironmentVariable('PATH', 'User'); if ($userPath -notlike '*\.onlysnap\bin*') { [Environment]::SetEnvironmentVariable('PATH', $userPath + ';%BIN_DIR%', 'User'); Write-Host 'PATH updated successfully!' } else { Write-Host 'Already in PATH.' }"
 ) else (
     echo PATH already contains OnlySnap bin folder.
 )
