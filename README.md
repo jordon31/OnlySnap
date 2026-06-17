@@ -22,6 +22,18 @@ Other tools require a PhD in coding to run; this one is built different. **EZ.**
 
 ### Linux / macOS
 
+**macOS — FIRST TIME SETUP (required):**
+
+Before running `run.sh`, remove the macOS quarantine flag or the system will block the scripts:
+
+```bash
+xattr -r -d com.apple.quarantine /Users/$(whoami)/Downloads/OnlySnap-main
+```
+
+> ⚠️ Replace `OnlySnap-main` with your actual folder name if you renamed it.
+
+Then:
+
 ```bash
 chmod +x run.sh
 ./run.sh
@@ -51,9 +63,43 @@ Same 4 options. DRM tools are installed via:
 
 ---
 
+## 🍎 macOS — KNOWN ISSUE (IMPORTANT)
+
+On macOS, **auto cookie scraping does NOT work** for OnlyFans and Patreon.
+
+**Why?** macOS ships with **LibreSSL** instead of OpenSSL. This creates a different TLS fingerprint that Cloudflare (which protects both sites) identifies as a bot. When Playwright opens the browser or the script makes API calls, Cloudflare **invalidates your session immediately** — logging you out.
+
+**The fix:** On macOS, the app automatically uses **clipboard mode** instead of Playwright. You copy headers from DevTools and paste them. It's a few extra seconds but your cookies stay alive.
+
+> ℹ️ This issue does NOT affect **Windows** or **Linux** — auto-scrape works normally on those platforms.
+
+### OnlyFans — Manual Cookie Setup (macOS)
+
+1. Open **https://onlyfans.com/my/chats/** in your browser
+2. Press **Cmd+Option+I** to open DevTools → go to the **Network** tab
+3. Refresh the page (**Cmd+R**)
+4. Find the request: `onlyfans.com/api2/v2/chats?limit=10&...`
+5. Click it → select the **Headers** tab
+6. Select **ALL** the headers text and copy (**Cmd+C**)
+7. Run the script — it will prompt you to press **ENTER** after copying
+
+### Patreon — Manual Cookie Setup (macOS)
+
+1. Open **https://www.patreon.com/messages/?mode=user&tab=chats** in your browser
+2. Press **Cmd+Option+I** to open DevTools → go to the **Network** tab
+3. Refresh the page (**Cmd+R**)
+4. Find the request: `patreon.com/_next/data/.../messages.json?mode=user&tab=chats`
+5. Click it → select the **Headers** tab
+6. Select **ALL** the headers text and copy (**Cmd+C**)
+7. Run the script — it will prompt you to press **ENTER** after copying
+
+---
+
 ## 🔑 AUTO COOKIE SCRAPE (DO THIS FIRST!)
 
 No more manual copy-paste of cookies. The app **auto-scrapes your browser session** directly.
+
+> ⚠️ **macOS users:** Auto-scrape is disabled on macOS due to Cloudflare TLS detection. See the [macOS section above](#-macos--known-issue-important) for the manual clipboard method.
 
 ### How it works
 
@@ -79,9 +125,18 @@ No more manual copy-paste of cookies. The app **auto-scrapes your browser sessio
 
 ### Headless / Server Mode (Linux without GUI)
 
-If you're on a Linux server with no desktop, the auto-scrape detects it automatically:
-- It skips the browser launch and prompts you to **paste your cookies manually** in the terminal
-- The script then saves them to `Auth.json` for you — no need to edit JSON files by hand
+If you're on a Linux server with no desktop, the auto-scrape detects it automatically and switches to **clipboard mode** — same process as macOS (see [manual cookie setup above](#onlyfans--manual-cookie-setup-macos)).
+
+### Manual Clipboard Mode (Fallback)
+
+If auto-scrape doesn't work on any platform, use **Option [2] Clipboard** in the cookie manager. The process is the same as the [macOS cookie setup](#-macos--known-issue-important) — copy headers from DevTools and the script reads them from your clipboard.
+
+You can also run the cookie scripts directly:
+
+```bash
+python Site/cookie-onlyfans.py   # OnlyFans cookie manager
+python Site/cookie-patreon.py    # Patreon cookie manager
+```
 
 ---
 
