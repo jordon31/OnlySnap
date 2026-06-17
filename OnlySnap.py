@@ -9,7 +9,7 @@ from textual.containers import Container, Vertical
 from textual.widgets import Label, Button
 from textual import on
 
-CURRENT_VERSION = "1.0.6"
+CURRENT_VERSION = "1.0.7"
 GITHUB_RAW_URL = "https://raw.githubusercontent.com/jordon31/OnlySnap/main/OnlySnap.py"
 
 def check_for_updates():
