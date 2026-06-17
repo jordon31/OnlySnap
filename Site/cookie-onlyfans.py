@@ -146,6 +146,51 @@ def detect_browser():
     home = os.path.expanduser("~")
     browsers = []
 
+    # Detect default browser
+    default_browser_name = None
+    if system == "Windows":
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice") as key:
+                prog_id = winreg.QueryValueEx(key, "ProgId")[0].lower()
+                if "brave" in prog_id: default_browser_name = "Brave"
+                elif "chrome" in prog_id: default_browser_name = "Chrome"
+                elif "edge" in prog_id or "msedge" in prog_id: default_browser_name = "Edge"
+                elif "opera" in prog_id: default_browser_name = "Opera"
+                elif "firefox" in prog_id: default_browser_name = "Firefox"
+                elif "vivaldi" in prog_id: default_browser_name = "Vivaldi"
+        except: pass
+    elif system == "Darwin":
+        try:
+            import plistlib
+            plist_path = os.path.join(home, "Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist")
+            with open(plist_path, 'rb') as f:
+                data = plistlib.load(f)
+            for handler in data.get('LSHandlers', []):
+                if handler.get('LSHandlerURLScheme') == 'http':
+                    bid = handler.get('LSHandlerRoleAll', '').lower()
+                    if 'brave' in bid: default_browser_name = "Brave"
+                    elif 'chrome' in bid: default_browser_name = "Chrome"
+                    elif 'edgemac' in bid: default_browser_name = "Edge"
+                    elif 'opera' in bid: default_browser_name = "Opera"
+                    elif 'firefox' in bid: default_browser_name = "Firefox"
+                    break
+        except: pass
+    else:  # Linux
+        try:
+            import subprocess
+            result = subprocess.run(['xdg-settings', 'get', 'default-web-browser'],
+                capture_output=True, text=True, timeout=5)
+            desktop = result.stdout.strip().lower()
+            if 'brave' in desktop: default_browser_name = "Brave"
+            elif 'chrome' in desktop: default_browser_name = "Chrome"
+            elif 'chromium' in desktop: default_browser_name = "Chromium"
+            elif 'edge' in desktop: default_browser_name = "Edge"
+            elif 'opera' in desktop: default_browser_name = "Opera"
+            elif 'firefox' in desktop: default_browser_name = "Firefox"
+        except: pass
+
     if system == "Windows":
         ff_profile = _find_firefox_profile(os.path.join(home, r"AppData\Roaming\Mozilla\Firefox\Profiles"))
         browsers = [
@@ -182,6 +227,7 @@ def detect_browser():
             browsers.append(("Firefox",
                 os.path.expandvars(r"%PROGRAMFILES(x86)%\Mozilla Firefox\firefox.exe"),
                 ff_profile))
+
     elif system == "Darwin":  # macOS
         ff_profile = _find_firefox_profile(os.path.join(home, "Library/Application Support/Firefox/Profiles"))
         browsers = [
@@ -227,6 +273,12 @@ def detect_browser():
             browsers.append(("Firefox", "/usr/bin/firefox-esr", ff_profile))
             browsers.append(("Firefox", "/snap/bin/firefox", ff_profile))
 
+    # Move default browser to the top (all platforms)
+    if default_browser_name:
+        default_entries = [b for b in browsers if b[0] == default_browser_name]
+        other_entries = [b for b in browsers if b[0] != default_browser_name]
+        browsers = default_entries + other_entries
+
     for name, exe_path, data_path in browsers:
         if os.path.isfile(exe_path) and os.path.isdir(data_path):
             return name, exe_path, data_path
@@ -269,6 +321,26 @@ def auto_scrape():
         print("❌ No display server detected (headless server).")
         print("   Use clipboard mode or add cookies manually to Auth.json.")
         return None
+
+    import platform as _plat
+    if _plat.system() == "Darwin":
+        while True:
+            print("\n⚠️  macOS detected — using clipboard mode (Playwright causes OF to invalidate sessions).")
+            print("")
+            print("HOW TO GET HEADERS:")
+            print("  1. Open https://onlyfans.com/my/chats/ in your browser")
+            print("  2. Press Cmd+Option+I to open DevTools → go to 'Network' tab")
+            print("  3. Refresh the page (Cmd+R)")
+            print("  4. Find the request: onlyfans.com/api2/v2/chats?limit=10&...")
+            print("  5. Click it → select 'Headers' tab")
+            print("  6. Select ALL the headers text and copy (Cmd+C)")
+            print("  7. Press ENTER here after copying...")
+            input()
+            result = clipboard_scrape()
+            if result:
+                return result
+            print("\n❌ Invalid or missing headers. Please try again.")
+            print("   (Make sure you copied ALL headers, not just the URL)\n")
 
     try:
         from playwright.sync_api import sync_playwright
@@ -370,14 +442,12 @@ def auto_scrape():
             print(f"   Cookies found: {list(cookie_dict.keys())}")
             
             if cookie_dict.get("sess"):
-                # Try to get x-of-rev from page
                 x_of_rev = ""
                 try:
                     x_of_rev = page.evaluate("() => { try { return window.__NEXT_DATA__?.buildId || '' } catch(e) { return '' } }")
                 except: pass
                 if not x_of_rev:
                     try:
-                        # Try from script tags
                         scripts = page.query_selector_all("script[src*='static']")
                         for s in scripts:
                             src = s.get_attribute("src") or ""
@@ -457,8 +527,16 @@ def clipboard_scrape():
 
     if not has_headers:
         print("\nERROR: No Headers found!")
-        print("Copy the 'onlyfans.com/api2/v2/lists?filter=chat' section from DevTools.")
-        time.sleep(3)
+        print("")
+        print("HOW TO GET HEADERS:")
+        print("  1. Open https://onlyfans.com/my/chats/ in your browser")
+        print("  2. Press F12 to open DevTools → go to 'Network' tab")
+        print("  3. Refresh the page (F5)")
+        print("  4. Find the request: onlyfans.com/api2/v2/chats?limit=10&...")
+        print("  5. Click it → select 'Headers' tab")
+        print("  6. Select ALL the headers text and CTRL + C (or use copy)")
+        print("  7. Run this script again with option [2]")
+        time.sleep(5)
         return None
 
     cookies = parse_cookies(extracted.get("cookie", ""))
