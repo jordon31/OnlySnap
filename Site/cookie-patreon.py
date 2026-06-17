@@ -100,6 +100,51 @@ def detect_browser():
     home = os.path.expanduser("~")
     browsers = []
 
+    # Detect default browser
+    default_browser_name = None
+    if system == "Windows":
+        try:
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice") as key:
+                prog_id = winreg.QueryValueEx(key, "ProgId")[0].lower()
+                if "brave" in prog_id: default_browser_name = "Brave"
+                elif "chrome" in prog_id: default_browser_name = "Chrome"
+                elif "edge" in prog_id or "msedge" in prog_id: default_browser_name = "Edge"
+                elif "opera" in prog_id: default_browser_name = "Opera"
+                elif "firefox" in prog_id: default_browser_name = "Firefox"
+                elif "vivaldi" in prog_id: default_browser_name = "Vivaldi"
+        except: pass
+    elif system == "Darwin":
+        try:
+            import plistlib
+            plist_path = os.path.join(home, "Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist")
+            with open(plist_path, 'rb') as f:
+                data = plistlib.load(f)
+            for handler in data.get('LSHandlers', []):
+                if handler.get('LSHandlerURLScheme') == 'http':
+                    bid = handler.get('LSHandlerRoleAll', '').lower()
+                    if 'brave' in bid: default_browser_name = "Brave"
+                    elif 'chrome' in bid: default_browser_name = "Chrome"
+                    elif 'edgemac' in bid: default_browser_name = "Edge"
+                    elif 'opera' in bid: default_browser_name = "Opera"
+                    elif 'firefox' in bid: default_browser_name = "Firefox"
+                    break
+        except: pass
+    else:  # Linux
+        try:
+            import subprocess
+            result = subprocess.run(['xdg-settings', 'get', 'default-web-browser'],
+                capture_output=True, text=True, timeout=5)
+            desktop = result.stdout.strip().lower()
+            if 'brave' in desktop: default_browser_name = "Brave"
+            elif 'chrome' in desktop: default_browser_name = "Chrome"
+            elif 'chromium' in desktop: default_browser_name = "Chromium"
+            elif 'edge' in desktop: default_browser_name = "Edge"
+            elif 'opera' in desktop: default_browser_name = "Opera"
+            elif 'firefox' in desktop: default_browser_name = "Firefox"
+        except: pass
+
     if system == "Windows":
         ff_profile = _find_firefox_profile(os.path.join(home, r"AppData\Roaming\Mozilla\Firefox\Profiles"))
         browsers = [
@@ -135,6 +180,7 @@ def detect_browser():
             browsers.append(("Firefox",
                 os.path.expandvars(r"%PROGRAMFILES(x86)%\Mozilla Firefox\firefox.exe"),
                 ff_profile))
+
     elif system == "Darwin":  # macOS
         ff_profile = _find_firefox_profile(os.path.join(home, "Library/Application Support/Firefox/Profiles"))
         browsers = [
@@ -180,6 +226,12 @@ def detect_browser():
             browsers.append(("Firefox", "/usr/bin/firefox-esr", ff_profile))
             browsers.append(("Firefox", "/snap/bin/firefox", ff_profile))
 
+    # Move default browser to the top (all platforms)
+    if default_browser_name:
+        default_entries = [b for b in browsers if b[0] == default_browser_name]
+        other_entries = [b for b in browsers if b[0] != default_browser_name]
+        browsers = default_entries + other_entries
+
     for name, exe_path, data_path in browsers:
         if os.path.isfile(exe_path) and os.path.isdir(data_path):
             return name, exe_path, data_path
@@ -222,6 +274,26 @@ def auto_scrape():
         print("❌ No display server detected (headless server).")
         print("   Use clipboard mode or add cookies manually to Auth.json.")
         return None
+
+    import platform as _plat
+    if _plat.system() == "Darwin":
+        while True:
+            print("\n⚠️  macOS detected — using clipboard mode (Playwright causes cookie invalidation).")
+            print("")
+            print("HOW TO GET HEADERS:")
+            print("  1. Open https://www.patreon.com/messages/?mode=user&tab=chats in your browser")
+            print("  2. Press Cmd+Option+I to open DevTools → go to 'Network' tab")
+            print("  3. Refresh the page (Cmd+R)")
+            print("  4. Find the request: patreon.com/_next/data/.../messages.json?mode=user&tab=chats")
+            print("  5. Click it → select 'Headers' tab")
+            print("  6. Select ALL the headers text and copy (Cmd+C)")
+            print("  7. Press ENTER here after copying...")
+            input()
+            result = clipboard_scrape()
+            if result:
+                return result
+            print("\n❌ Invalid or missing headers. Please try again.")
+            print("   (Make sure you copied ALL headers, not just the URL)\n")
 
     try:
         from playwright.sync_api import sync_playwright
@@ -305,12 +377,36 @@ def auto_scrape():
 
         print("   Navigating to patreon.com/messages...")
         try:
-            page.goto("https://www.patreon.com/messages?mode=user&tab=chats", wait_until="domcontentloaded", timeout=15000)
+            page.goto("https://www.patreon.com/messages?mode=user&tab=chats", wait_until="domcontentloaded", timeout=60000)
             print(f"   Page loaded. URL: {page.url}")
         except:
             print(f"   Page load slow but continuing... URL: {page.url}")
 
-        time.sleep(1)
+
+        print("   Waiting for page to be ready (complete any captcha if shown)...")
+        max_wait = 120  # 2 minutes max
+        waited = 0
+        while waited < max_wait:
+            try:
+                cookies_check = context.cookies("https://www.patreon.com")
+                has_session = any(c['name'] == 'session_id' for c in cookies_check)
+                current_url = page.url
+
+                if has_session:
+                    print(f"   ✅ Session found after {waited}s")
+                    break
+                if "patreon.com/messages" in current_url or "patreon.com/home" in current_url:
+
+                    time.sleep(2)
+                    break
+            except:
+                pass
+            time.sleep(3)
+            waited += 3
+            if waited % 15 == 0:
+                print(f"   ⏳ Still waiting... ({waited}s / {max_wait}s)")
+
+        time.sleep(2)
 
         try:
             browser_cookies = context.cookies("https://www.patreon.com")
