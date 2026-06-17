@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.7] - 2026-06-17
+
+### Fixed
+- **macOS Cookie Invalidation:** Fixed critical issue where OnlyFans and Patreon sessions were being immediately invalidated on macOS. Root cause: macOS ships with LibreSSL instead of OpenSSL, producing a TLS fingerprint that Cloudflare detects as a bot.
+- **macOS API Calls:** Replaced `requests` with `curl_cffi` (Chrome TLS impersonation) on macOS for all OnlyFans API calls. Cloudflare no longer blocks them.
+- **macOS Cookie Validation Loop:** Skipped the startup cookie validation API call on macOS (which was itself triggering Cloudflare and killing the session). Now checks locally that `sess=` exists in Auth.json.
+- **Cookie Validation Case Bug:** Fixed `"Cookie"` vs `"cookie"` case mismatch that caused macOS to always report cookies as missing.
+- **Patreon Captcha Timeout:** Increased Playwright timeout from 15s to 60s and added a 2-minute wait loop for Cloudflare captcha completion on Patreon (Windows/Linux).
+- **LibreSSL Warning:** Suppressed the `NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+` warning on macOS.
+
+### Added
+- **macOS Clipboard Mode:** On macOS, auto-scrape now bypasses Playwright entirely (which causes session invalidation) and uses clipboard mode with step-by-step instructions for both OnlyFans and Patreon.
+- **Retry Loop (macOS):** If the user pastes invalid or incomplete headers in clipboard mode, the script keeps asking until valid headers are provided — never enters the TUI with broken cookies.
+- **Runtime Cookie Expiry Detection:** Added 401/403 detection in `api_request()` — if cookies expire during usage, a clear error message is shown instead of silent failures.
+- **macOS Quarantine Fix:** Added `xattr -r -d com.apple.quarantine` instructions to README with `$(whoami)` for automatic username resolution.
+
+### Changed
+- **README.md Updated:** Added macOS known issue section, manual cookie setup tutorials (OnlyFans + Patreon), quarantine fix, and simplified the headless/clipboard sections to reference the macOS tutorial.
+
+--------------------------------------------
 ## [1.0.6] - 2026-06-16
 
 ### Added
