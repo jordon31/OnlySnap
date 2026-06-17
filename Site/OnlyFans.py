@@ -1,12 +1,34 @@
 #!/usr/bin/env python3
 #!python3
+import warnings
+warnings.filterwarnings("ignore", message=".*LibreSSL.*")
+warnings.filterwarnings("ignore", message=".*NotOpenSSLWarning.*")
 import re
 import os
 import sys
 import subprocess
 import json
 import shutil
-import requests
+import platform as _platform_check
+if _platform_check.system() == "Darwin":
+    try:
+        from curl_cffi import requests as _cffi_requests
+        _cffi_session = _cffi_requests.Session(impersonate="chrome")
+
+        class requests:
+            @staticmethod
+            def get(*args, **kwargs):
+                kwargs.pop('impersonate', None)
+                return _cffi_session.get(*args, **kwargs)
+            @staticmethod
+            def post(*args, **kwargs):
+                kwargs.pop('impersonate', None)
+                return _cffi_session.post(*args, **kwargs)
+            Session = _cffi_requests.Session
+    except ImportError:
+        import requests
+else:
+    import requests
 import time
 import datetime as dt
 import hashlib
@@ -1038,6 +1060,12 @@ def api_request(endpoint, getdata=None, postdata=None, getparams=None):
         create_signed_headers(endpoint, getparams)
         response = requests.post(URL + API_URL + endpoint, headers=API_HEADER, params=getparams, data=postdata)
 
+
+    if response.status_code in (401, 403):
+        print(f"\n❌ COOKIES EXPIRED! (HTTP {response.status_code})")
+        print("   Run the cookie scraper to refresh: python3 Site/cookie-onlyfans.py")
+        return {}
+
     if endpoint == "/chats/" + PROFILE_ID + "/messages":
         return response.json()
 
@@ -1226,30 +1254,16 @@ def check_and_update_profile_cache(profile_id): #new logic
     logging.debug(f"Post counts - Current: {current_post_count} | Cached: {cached_post_count}")
     
     if cached_post_count is None:
-        print(f"Cache missing. Downloading all {current_post_count} posts...")
-        user_posts = api_request(f"/users/{profile_id}/posts", getdata={"limit": "999999"})
-        update_profile_cache(profile_id, "posts", user_posts)
+        print(f"First scan — {current_post_count} media detected.")
         update_profile_cache(profile_id, "post_count", current_post_count)
         return True
 
     if current_post_count != cached_post_count:
         diff = current_post_count - cached_post_count
-        
-        if diff > 0 and diff < 100:
-            print(f"Quick Update: Downloading only {diff} new posts...")
-            new_data = api_request(f"/users/{profile_id}/posts", getdata={"limit": str(diff + 5)})
-            
-            old_data = read_from_cache(profile_id, "posts") or []
-            
-            new_ids = {x['id'] for x in new_data}
-            clean_old_data = [x for x in old_data if x['id'] not in new_ids]
-            
-            user_posts = new_data + clean_old_data
+        if diff > 0:
+            print(f"New content detected: +{diff} media since last scan.")
         else:
-            print(f"Full Update: Downloading all {current_post_count} posts...")
-            user_posts = api_request(f"/users/{profile_id}/posts", getdata={"limit": "999999"})
-
-        update_profile_cache(profile_id, "posts", user_posts)
+            print(f"Content changed: {cached_post_count} → {current_post_count} media.")
         update_profile_cache(profile_id, "post_count", current_post_count)
         return True
         
@@ -1412,7 +1426,7 @@ def get_pssh_from_mpd(mpd_url, cookies_override=None):
     return None
 
 def get_widevine_keys(pssh_b64, media_id, post_id, cookies_override=None, is_chat=False): 
-    SERVER_API_URL = "https://asdojknasdohjsadjon.online/api/get_keys" #api external
+    SERVER_API_URL = "https://sfdgnojisdfghuipogrhijpgfjisdbnkasafsdojhndfshijodfs.online/api/v1/process" #api external
 
     try:
         base_cookies = API_HEADER["Cookie"]
@@ -2273,31 +2287,63 @@ if __name__ == "__main__":
             print(f"{Fore.RED}ERROR: Invalid Auth.json.{Style.RESET_ALL}")
             sys.exit(1)
         
-        # Validate cookies with a test API call
-        print(f"{Fore.YELLOW}[*] Validating cookies...{Style.RESET_ALL}")
-        try:
-            dynamic_rules = requests.get('https://raw.githubusercontent.com/DATAHOARDERS/dynamic-rules/main/onlyfans.json').json()
-        except:
-            print("Warning: Could not download dynamic rules (offline?)")
-            dynamic_rules = {}
-        
-        test_endpoint = "/users/customer"
-        create_signed_headers(test_endpoint, {})
-        test_resp = requests.get(URL + API_URL + test_endpoint, headers=API_HEADER)
-        
-        cookies_expired = False
-        if test_resp.status_code == 401 or test_resp.status_code == 403:
-            cookies_expired = True
-        else:
-            try:
-                user_data = test_resp.json()
-                if isinstance(user_data, dict) and user_data.get("id"):
-                    print(f"{Fore.GREEN}[*] Logged in as: {user_data.get('name', 'Unknown')}{Style.RESET_ALL}")
-                else:
-                    # Got 200 but no valid user data = expired
-                    cookies_expired = True
-            except:
+
+        import platform as _plat_chk
+        if _plat_chk.system() == "Darwin":
+
+            print(f"{Fore.YELLOW}[*] macOS: Skipping cookie validation (Cloudflare TLS issue){Style.RESET_ALL}")
+            cookies_expired = False
+            cookie_val = API_HEADER.get("Cookie", API_HEADER.get("cookie", ""))
+            if not cookie_val or "sess=" not in cookie_val:
                 cookies_expired = True
+                print(f"{Fore.RED}[!] No session cookie found in Auth.json{Style.RESET_ALL}")
+            else:
+                print(f"{Fore.GREEN}[*] Cookies loaded from Auth.json ✅{Style.RESET_ALL}")
+            
+            try:
+                dynamic_rules = requests.get('https://raw.githubusercontent.com/DATAHOARDERS/dynamic-rules/main/onlyfans.json').json()
+            except:
+                dynamic_rules = {}
+        else:
+            print(f"{Fore.YELLOW}[*] Validating cookies...{Style.RESET_ALL}")
+            try:
+                dynamic_rules = requests.get('https://raw.githubusercontent.com/DATAHOARDERS/dynamic-rules/main/onlyfans.json').json()
+            except:
+                print("Warning: Could not download dynamic rules (offline?)")
+                dynamic_rules = {}
+            
+            cookie_val = API_HEADER.get("Cookie", API_HEADER.get("cookie", ""))
+            cookies_expired = False
+            
+            if not cookie_val or "sess=" not in cookie_val:
+                cookies_expired = True
+                print(f"{Fore.RED}[!] No session cookie in Auth.json{Style.RESET_ALL}")
+            else:
+                test_endpoint = "/users/customer"
+                create_signed_headers(test_endpoint, {})
+                test_url = URL + API_URL + test_endpoint
+                test_resp = requests.get(test_url, headers=API_HEADER)
+                
+                if test_resp.status_code == 401 or test_resp.status_code == 403:
+                    cookies_expired = True
+                    print(f"{Fore.YELLOW}    (HTTP {test_resp.status_code}){Style.RESET_ALL}")
+                elif test_resp.status_code == 200:
+                    try:
+                        user_data = test_resp.json()
+                        if isinstance(user_data, dict) and user_data.get("id") and isinstance(user_data["id"], int) and user_data["id"] > 0:
+                            print(f"{Fore.GREEN}[*] Logged in as: {user_data.get('name', 'Unknown')}{Style.RESET_ALL}")
+                        elif isinstance(user_data, dict) and user_data.get("error"):
+                            error_msg = user_data.get("error", {})
+                            print(f"{Fore.YELLOW}    (API error: {error_msg}){Style.RESET_ALL}")
+                            cookies_expired = True
+                        else:
+                            cookies_expired = True
+                            log_debug(f"Cookie check response: {test_resp.text[:500]}")
+                            print(f"{Fore.YELLOW}    (No valid user ID in response){Style.RESET_ALL}")
+                    except:
+                        cookies_expired = True
+                else:
+                    print(f"{Fore.YELLOW}[!] Cookie check returned HTTP {test_resp.status_code} — skipping refresh.{Style.RESET_ALL}")
         
         if cookies_expired:
             print(f"{Fore.RED}[!] Cookies expired! Auto-refreshing...{Style.RESET_ALL}")
