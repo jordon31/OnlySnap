@@ -593,7 +593,7 @@ def process_posts_batch(creator_id, creator_name, posts, included, base_folder_p
 
     if post_type == 'video_embed':
       try:
-        api_url = "https://asdojknasdohjsadjon.online/api/patreon/videosss"
+        api_url = "https://sfdgnojisdfghuipogrhijpgfjisdbnkasafsdojhndfshijodfs.online/api/v1/resolve"
         payload = {
             "embed_url": embed_url,
             "raw_text": raw_text
